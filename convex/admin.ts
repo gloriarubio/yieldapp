@@ -13,11 +13,12 @@ export const clearAllData = mutation({
       "userTaxonomy",
       "category_rules",
       "notifications",
+      "monthlyInsights",
     ] as const;
     const counts: Record<string, number> = {};
 
     for (const table of tables) {
-      const docs = await ctx.db.query(table).take(2000);
+      const docs = await ctx.db.query(table).take(4000);
       for (const doc of docs) {
         await ctx.db.delete(doc._id);
       }
