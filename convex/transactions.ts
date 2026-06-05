@@ -2,6 +2,7 @@ import { internalMutation, internalQuery, mutation, query, MutationCtx } from ".
 import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { resolveMerchantCategories } from "../src/lib/categorization";
+import { normalizeDate } from "../src/lib/dates";
 
 const transactionValidator = v.object({
   userId: v.string(),
@@ -64,6 +65,30 @@ export const getTransactionsByMonth = internalQuery({
           .lte("date", `${args.month}-31`)
       )
       .take(2000);
+  },
+});
+
+// One-off migration: older parsers stored bank dates verbatim ("02/05/2025"),
+// which breaks month filters and the header selector (NaN). Normalizes every
+// non-ISO date to YYYY-MM-DD. Run with:
+//   npx convex run transactions:fixMalformedDates
+export const fixMalformedDates = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    let fixed = 0;
+    let unparseable = 0;
+    for await (const tx of ctx.db.query("transactions")) {
+      if (/^\d{4}-\d{2}-\d{2}$/.test(tx.date)) continue;
+      const normalized = normalizeDate(tx.date);
+      if (normalized) {
+        await ctx.db.patch(tx._id, { date: normalized });
+        fixed++;
+      } else {
+        unparseable++;
+        console.warn(`Unparseable date "${tx.date}" on ${tx._id}`);
+      }
+    }
+    return { fixed, unparseable };
   },
 });
 

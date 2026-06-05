@@ -9,6 +9,7 @@ import * as XLSX from "xlsx";
 import Papa from "papaparse";
 import { applyUserRules, getAmbiguousMerchants } from "../src/lib/categorization";
 import { categorizeWithAI } from "../src/lib/categorization-ai";
+import { normalizeDate } from "../src/lib/dates";
 
 const SEED_CATEGORIES = [
   "Supermercado",
@@ -461,9 +462,7 @@ export async function extractFromStructuredFile(
   const transactions: TxRow[] = [];
 
   for (const row of rows) {
-    let date = row[dateKey];
-    if (date instanceof Date) date = (date as Date).toISOString().slice(0, 10);
-    const dateStr = String(date ?? "").trim();
+    const dateStr = normalizeDate(row[dateKey]);
     if (!dateStr) continue;
 
     const amount = Number(row[amountKey]);
@@ -652,7 +651,8 @@ function toolResponseToRows(
   return (input.transactions ?? []).map((tx) => ({
     userId,
     statementId,
-    date: tx.date,
+    // Claude is asked for YYYY-MM-DD, but normalize defensively anyway
+    date: normalizeDate(tx.date) ?? tx.date,
     description: tx.description,
     amount: Number(tx.amount),
     category: tx.category,

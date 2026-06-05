@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
@@ -14,16 +14,22 @@ import { SubscriptionsWidget } from "@/components/app/dashboard/SubscriptionsWid
 import { DayHeatmap } from "@/components/app/dashboard/DayHeatmap";
 import { MonthInsights } from "@/components/app/dashboard/MonthInsights";
 
+// useSyncExternalStore is the lint-approved way to subscribe to a media
+// query: no setState-in-effect, SSR-safe via the third argument
+const MOBILE_QUERY = "(max-width: 767px)";
+
+function subscribeToMediaQuery(callback: () => void) {
+  const mq = window.matchMedia(MOBILE_QUERY);
+  mq.addEventListener("change", callback);
+  return () => mq.removeEventListener("change", callback);
+}
+
 function useIsMobile() {
-  const [mobile, setMobile] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 767px)");
-    setMobile(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setMobile(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, []);
-  return mobile;
+  return useSyncExternalStore(
+    subscribeToMediaQuery,
+    () => window.matchMedia(MOBILE_QUERY).matches,
+    () => false // server snapshot
+  );
 }
 
 const MONTH_NAMES_SHORT = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
@@ -190,7 +196,12 @@ export default function DashboardPage() {
   // If the selected month has no data, jump to the most recent month that does
   const availableMonths = useMemo(() => {
     if (!transactions?.length) return [];
-    return [...new Set(transactions.map((t) => t.date.slice(0, 7)))].sort().reverse();
+    return [...new Set(transactions.map((t) => t.date.slice(0, 7)))]
+      // A malformed date ("02/05/2" → NaN in the header) must never drive
+      // the month selector
+      .filter((m) => /^\d{4}-\d{2}$/.test(m))
+      .sort()
+      .reverse();
   }, [transactions]);
 
   useEffect(() => {
