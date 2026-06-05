@@ -100,6 +100,16 @@ API REST para integraciones externas (n8n, Zapier, scripts), servida por Convex 
 - **Pipeline reutilizable**: la fase común de categorización+guardado de `processStatement` está extraída en el helper `categorizeAndFinalize` (`convex/process.ts`); `processStatement` acepta `statementId` opcional (el http action crea el statement antes para devolver el id en el 202 y luego programa la action con `ctx.scheduler.runAfter`).
 - **UI**: `/app/ajustes` tiene pestañas — "API" (gestión de claves + banner a la documentación) y "Notificaciones" (placeholder). La documentación pública vive en `/docs/api` (`src/app/docs/api/page.tsx`, server component estático con estilo de la landing) y está enlazada desde la pestaña API y desde la columna "Recursos" del Footer de la landing.
 
+### Proyecciones — planificador de ahorro (jun 2026)
+
+`/app/proyecciones` (Pro) pasó de simulador de sliders a planificador completo:
+
+- **Tabla `projection_plans`** (1 doc/usuario, autosave con debounce 700ms): meta (nombre+importe+fecha opcional), `categoryCuts` (recorte €/mes por categoría), `cancelledSubscriptions` (nombres), `aiVerdict` cacheado. CRUD en `convex/projections.ts`.
+- **Stats puras** en `src/lib/projections.ts` (compartidas por la página y la action de IA): **medianas** con rango p25-p75 (nunca medias), tendencia (últimos 3 meses vs anteriores, ±15%), suscripciones activas (cargo en los últimos 45 días del dataset), top comercio por categoría (si ≥25% del total), `monthsToTarget`/`addMonths`.
+- **UI**: tarjeta de meta con ETA a ritmo actual vs con plan; gráfica SVG de trayectoria (línea punteada=actual, sólida=simulada, línea de meta); toggles de suscripciones ("palanca rápida"); sliders por categoría (máx=mediana redondeada, step 1 — regla del slider bug) con badge de tendencia y hint del comercio dominante; los sliders EXCLUYEN "Suscripciones" para no contar dos veces el mismo euro.
+- **Veredicto IA** (`convex/projectionsActions.ts`, `"use node"`): Claude evalúa la viabilidad del plan (recortes >40% del típico = irreales, palancas sin usar, llegada a la meta) y se guarda en el plan. El cliente hace flush del autosave antes de evaluar.
+- Patrón de estado: ediciones locales en `useState` como capa sobre el plan guardado (`local ?? saved ?? 0`) — evita el lint de setState-en-effect al hidratar.
+
 ### Stripe — suscripciones (jun 2026)
 
 Planes: **Free** (única subida inicial completa; después datos en solo lectura) y **Pro** 7€/mes o 59€/año (subidas recurrentes + creación de claves de API).

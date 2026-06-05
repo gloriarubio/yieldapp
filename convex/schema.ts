@@ -141,6 +141,22 @@ export default defineSchema({
     })),
   }).index("by_userId", ["userId"]),
 
+  // Savings plan built in /app/proyecciones (Pro): goal + simulated cuts.
+  // One document per user; the page autosaves so the plan survives sessions.
+  projection_plans: defineTable({
+    userId: v.string(),
+    goalName: v.optional(v.string()),
+    targetAmount: v.optional(v.number()),
+    targetDate: v.optional(v.string()), // "YYYY-MM"
+    // Simulated monthly cut per category (absolute €/month)
+    categoryCuts: v.array(v.object({ category: v.string(), monthlyCut: v.number() })),
+    // Subscriptions toggled as "cancelled" in the simulation (merchant names)
+    cancelledSubscriptions: v.array(v.string()),
+    // Cached Claude feasibility verdict (regenerated on demand)
+    aiVerdict: v.optional(v.object({ text: v.string(), generatedAt: v.number() })),
+    updatedAt: v.number(),
+  }).index("by_userId", ["userId"]),
+
   // Stripe subscription state, kept in sync by the /stripe/webhook HTTP route.
   // One row per user; absence of a row (or a non-active status) means Free.
   subscriptions: defineTable({

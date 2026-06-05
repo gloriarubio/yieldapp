@@ -20,6 +20,8 @@ import type * as insightsActions from "../insightsActions.js";
 import type * as notifications from "../notifications.js";
 import type * as onboarding from "../onboarding.js";
 import type * as process from "../process.js";
+import type * as projections from "../projections.js";
+import type * as projectionsActions from "../projectionsActions.js";
 import type * as statements from "../statements.js";
 import type * as stripeActions from "../stripeActions.js";
 import type * as subscriptionHelpers from "../subscriptionHelpers.js";
@@ -48,6 +50,8 @@ declare const fullApi: ApiFromModules<{
   notifications: typeof notifications;
   onboarding: typeof onboarding;
   process: typeof process;
+  projections: typeof projections;
+  projectionsActions: typeof projectionsActions;
   statements: typeof statements;
   stripeActions: typeof stripeActions;
   subscriptionHelpers: typeof subscriptionHelpers;
