@@ -22,11 +22,14 @@ export type CategoryRuleInput = {
   merchantPattern: string;
   category: string;
   isSubscription: boolean;
+  /** "no contabilizar": matching transactions are inserted as excluded */
+  excludeFromAnalysis?: boolean;
 };
 
 export type RuleMatch<T> = T & {
   category: string;
   isSubscription: boolean;
+  excludeFromAnalysis?: boolean;
   merchantPattern: string;
   categorySource: "rule";
 };
@@ -37,6 +40,14 @@ export type AICategorization = {
   isSubscription: boolean;
   confidence: "high" | "low";
   merchantPattern: string;
+  /** Other plausible categories Claude considered (low-confidence verdicts) */
+  alternatives?: string[];
+};
+
+export type SampleTransaction = {
+  date: string;
+  description: string;
+  amount: number;
 };
 
 export type AmbiguousMerchantGroup = {
@@ -44,8 +55,12 @@ export type AmbiguousMerchantGroup = {
   totalAmount: number;
   count: number;
   examples: string[];
+  /** Real transactions behind the question (up to 8, newest first) */
+  transactions: SampleTransaction[];
   suggestedCategories: string[];
   isSubscriptionCandidate: boolean;
+  /** "transfer" = recurring transfer/Bizum detected by heuristic (block A) */
+  kind: "merchant" | "transfer";
 };
 
 // Categories offered to Claude when the user has no taxonomy yet (onboarding).
@@ -208,10 +223,19 @@ function suggestAlternates(merchantPattern: string): string[] {
  * Max 10 groups, sorted by totalAmount desc. Everything else keeps Claude's
  * automatic categorization.
  */
+function sampleTxs(txs: CategorizableTransaction[], max = 8): SampleTransaction[] {
+  return [...txs]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, max)
+    .map((t) => ({ date: t.date, description: t.description, amount: t.amount }));
+}
+
 export function getAmbiguousMerchants(
   aiResults: AICategorization[],
   transactions: CategorizableTransaction[],
-  maxGroups = 10
+  maxGroups = 10,
+  /** Patterns already covered by block-A questions (special movements) */
+  skipPatterns?: Set<string>
 ): AmbiguousMerchantGroup[] {
   const txById = new Map(transactions.map((t) => [String(t.id), t]));
 
@@ -227,6 +251,7 @@ export function getAmbiguousMerchants(
   for (const res of aiResults) {
     const tx = txById.get(String(res.id));
     if (!tx || tx.amount >= 0) continue;
+    if (skipPatterns?.has(res.merchantPattern)) continue;
 
     const key = res.merchantPattern;
     if (!groups.has(key)) groups.set(key, { results: [], txs: [] });
@@ -260,9 +285,13 @@ export function getAmbiguousMerchants(
     for (const r of g.results) freq.set(r.category, (freq.get(r.category) ?? 0) + 1);
     const mode = [...freq.entries()].sort((a, b) => b[1] - a[1])[0][0];
 
+    // Prefer the alternatives Claude itself proposed; fall back to hints
+    const aiAlternatives = [...new Set(g.results.flatMap((r) => r.alternatives ?? []))];
     const suggestedCategories = [
       mode,
-      ...suggestAlternates(merchantPattern).filter((c) => c !== mode),
+      ...(aiAlternatives.length > 0 ? aiAlternatives : suggestAlternates(merchantPattern)).filter(
+        (c) => c !== mode
+      ),
     ].slice(0, 3);
 
     out.push({
@@ -270,8 +299,66 @@ export function getAmbiguousMerchants(
       totalAmount,
       count,
       examples: g.txs.slice(0, 2).map((t) => t.description),
+      transactions: sampleTxs(g.txs),
       suggestedCategories,
       isSubscriptionCandidate,
+      kind: "merchant",
+    });
+  }
+
+  return out.sort((a, b) => b.totalAmount - a.totalAmount).slice(0, maxGroups);
+}
+
+// ─── Special movements (onboarding block A) ──────────────────────────────────
+// Transfers, Bizums and account-to-account movements the AI cannot interpret:
+// only the user knows whether 600€/month to "TRANSF. CUENTA 44XX" is savings,
+// rent or plain spending — or whether it should not count at all.
+
+const TRANSFER_RE = /TRANSFER|TRANSF\b|TRASPASO|BIZUM|ENVIO DE DINERO|ORDEN DE PAGO/i;
+
+export function detectSpecialMovements(
+  transactions: Array<{
+    date: string;
+    description: string;
+    amount: number;
+    merchantPattern?: string;
+  }>,
+  maxGroups = 4
+): AmbiguousMerchantGroup[] {
+  const expenses = transactions.filter((t) => t.amount < 0);
+  const totalExpenses = expenses.reduce((a, t) => a + Math.abs(t.amount), 0);
+  if (totalExpenses === 0) return [];
+
+  const groups = new Map<string, CategorizableTransaction[]>();
+  for (const t of expenses) {
+    if (!TRANSFER_RE.test(t.description)) continue;
+    const pattern = t.merchantPattern || normalizeMerchant(t.description);
+    if (!groups.has(pattern)) groups.set(pattern, []);
+    groups.get(pattern)!.push({ id: "", date: t.date, description: t.description, amount: t.amount });
+  }
+
+  const out: AmbiguousMerchantGroup[] = [];
+  for (const [merchantPattern, txs] of groups) {
+    const totalAmount = txs.reduce((a, t) => a + Math.abs(t.amount), 0);
+    const count = txs.length;
+    const share = totalAmount / totalExpenses;
+    const months = new Set(txs.map((t) => t.date.slice(0, 7)));
+    const isRecurring = months.size >= 2 && count >= 2;
+
+    // Worth asking when it's real money: recurring, or a big one-off (>3%)
+    if (!isRecurring && share < 0.03) continue;
+    if (totalAmount < 50) continue;
+
+    out.push({
+      merchantPattern,
+      totalAmount,
+      count,
+      examples: txs.slice(0, 2).map((t) => t.description),
+      transactions: sampleTxs(txs),
+      // The user decides what this money IS — the AI can't know
+      suggestedCategories: ["Ahorro", "Vivienda", "Transferencias"],
+      isSubscriptionCandidate: false,
+      kind: "transfer",
     });
   }
 

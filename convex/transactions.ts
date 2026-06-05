@@ -17,6 +17,7 @@ const transactionValidator = v.object({
   categorySource: v.optional(
     v.union(v.literal("rule"), v.literal("ai"), v.literal("manual"))
   ),
+  excluded: v.optional(v.boolean()),
 });
 
 export const insertTransactions = internalMutation({

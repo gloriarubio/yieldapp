@@ -92,6 +92,7 @@ export const processOnboardingStatement = action({
           merchantPattern: r.merchantPattern,
           category: r.category,
           isSubscription: r.isSubscription,
+          excludeFromAnalysis: r.excludeFromAnalysis === true,
         }))
       );
 
@@ -157,6 +158,10 @@ export const processOnboardingStatement = action({
 
       // 5. Persist transactions (the wizard answers will re-patch them later
       //    via saveOnboardingRules, matching by merchantPattern)
+      // Pre-existing exclusion rules (mini-wizard reruns) flag rows up front
+      const excludedPatterns = new Set(
+        rules.filter((r) => r.excludeFromAnalysis === true).map((r) => r.merchantPattern)
+      );
       const count: number = await ctx.runMutation(internal.transactions.insertTransactions, {
         transactions: results.map((r) => ({
           userId: args.userId,
@@ -168,6 +173,7 @@ export const processOnboardingStatement = action({
           type: r.type,
           merchantPattern: r.merchantPattern,
           categorySource: r.categorySource,
+          ...(excludedPatterns.has(r.merchantPattern) ? { excluded: true } : {}),
         })),
       });
 

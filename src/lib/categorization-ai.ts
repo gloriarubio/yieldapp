@@ -50,6 +50,8 @@ type MerchantVerdict = {
   category: string;
   isSubscription: boolean;
   confidence: "high" | "low";
+  /** Other plausible categories when the verdict is ambiguous */
+  alternatives?: string[];
 };
 
 /**
@@ -105,6 +107,7 @@ Categoriza estos COMERCIOS (agrupan transacciones de un extracto bancario españ
 - category: la categoría más probable
 - isSubscription: true solo si hay evidencia de pago recurrente mensual/anual (mismo importe repetido, un cargo al mes)
 - confidence: "high" si estás seguro, "low" si es ambiguo
+- alternatives: SOLO si confidence es "low", hasta 2 categorías alternativas plausibles (las que dudaste); si es "high", omite el campo
 
 Categorías disponibles: ${categories.join(", ")}
 
@@ -114,10 +117,13 @@ COMERCIOS (id|nombre|ejemplo de descripción|frecuencia|importes):
 ${lines.join("\n")}
 
 Responde ÚNICAMENTE con un array JSON válido sin markdown, incluyendo TODOS los ids:
-[{"id":0,"category":"...","isSubscription":false,"confidence":"high"}]`;
+[{"id":0,"category":"...","isSubscription":false,"confidence":"high"},{"id":1,"category":"...","isSubscription":false,"confidence":"low","alternatives":["...","..."]}]`;
 
     const out: AICategorization[] = [];
     const emit = (m: MerchantEntry, v: MerchantVerdict | undefined) => {
+      const alternatives = Array.isArray(v?.alternatives)
+        ? v!.alternatives.filter((a): a is string => typeof a === "string").slice(0, 2)
+        : undefined;
       for (const tx of m.txs) {
         out.push({
           id: tx.id,
@@ -125,6 +131,7 @@ Responde ÚNICAMENTE con un array JSON válido sin markdown, incluyendo TODOS lo
           isSubscription: v?.isSubscription === true,
           confidence: v?.confidence === "high" ? "high" : "low",
           merchantPattern: m.pattern,
+          alternatives,
         });
       }
     };

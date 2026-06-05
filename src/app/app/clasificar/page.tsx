@@ -44,7 +44,7 @@ export default function ClasificarPage() {
     const categoryNames = activeCategories.map((c) => c.name);
 
     return notification.merchantPatterns
-      .map((pattern) => {
+      .map((pattern): AmbiguousMerchantGroup | null => {
         const txs = transactions.filter((t) => {
           const p = t.merchantPattern ?? normalizeMerchant(t.description);
           return t.amount < 0 && (p === pattern || p.includes(pattern));
@@ -67,8 +67,13 @@ export default function ClasificarPage() {
           totalAmount: amounts.reduce((a, b) => a + b, 0),
           count: txs.length,
           examples: txs.slice(0, 2).map((t) => t.description),
+          transactions: [...txs]
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 8)
+            .map((t) => ({ date: t.date, description: t.description, amount: t.amount })),
           suggestedCategories: [mode, ...alternates].slice(0, 3),
           isSubscriptionCandidate: sameAmount && months.size === txs.length && txs.length >= 2,
+          kind: "merchant" as const,
         };
       })
       .filter((g): g is AmbiguousMerchantGroup => g !== null);
@@ -98,6 +103,7 @@ export default function ClasificarPage() {
           merchantPattern: g.merchantPattern,
           category: answerFor(g).category,
           isSubscription: answerFor(g).isSubscription,
+          exclude: answerFor(g).exclude === true,
         })),
         completeOnboarding: false,
       });
@@ -137,6 +143,7 @@ export default function ClasificarPage() {
           key={g.merchantPattern}
           group={g}
           answer={answerFor(g)}
+          allCategories={activeCategories.map((c) => c.name)}
           onAnswer={(a) => setAnswers((prev) => ({ ...prev, [g.merchantPattern]: a }))}
         />
       ))}

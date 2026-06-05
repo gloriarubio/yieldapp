@@ -1,4 +1,4 @@
-import { internalQuery, mutation, query, MutationCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, MutationCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { normalizeMerchant } from "../src/lib/categorization";
 import { SEED_CATEGORIES } from "./taxonomy";
@@ -9,6 +9,8 @@ const answerValidator = v.object({
   merchantPattern: v.string(),
   category: v.string(),
   isSubscription: v.boolean(),
+  // "no contabilizar": exclude this merchant's transactions from all analyses
+  exclude: v.optional(v.boolean()),
 });
 
 const renameValidator = v.object({
@@ -43,7 +45,12 @@ export const getUserRulesInternal = internalQuery({
 async function upsertRule(
   ctx: MutationCtx,
   userId: string,
-  answer: { merchantPattern: string; category: string; isSubscription: boolean },
+  answer: {
+    merchantPattern: string;
+    category: string;
+    isSubscription: boolean;
+    excludeFromAnalysis?: boolean;
+  },
   source: "onboarding" | "user_edit"
 ) {
   const existing = await ctx.db
@@ -57,6 +64,7 @@ async function upsertRule(
     await ctx.db.patch(existing._id, {
       category: answer.category,
       isSubscription: answer.isSubscription,
+      excludeFromAnalysis: answer.excludeFromAnalysis === true,
       source,
       confirmedAt: Date.now(),
     });
@@ -66,6 +74,7 @@ async function upsertRule(
       merchantPattern: answer.merchantPattern,
       category: answer.category,
       isSubscription: answer.isSubscription,
+      excludeFromAnalysis: answer.excludeFromAnalysis === true,
       source,
       confirmedAt: Date.now(),
     });
@@ -169,22 +178,36 @@ export const saveOnboardingRules = mutation({
     const renameMap = new Map(renames.map((r) => [r.from, r.to]));
     const finalName = (cat: string) => renameMap.get(cat) ?? cat;
 
-    // 1. Upsert one rule per answer (with renamed category names)
+    // 1. Upsert one rule per answer (with renamed category names).
+    //    exclude answers become "no contabilizar" rules: future uploads insert
+    //    matching transactions as excluded automatically.
     for (const answer of args.answers) {
       await upsertRule(
         ctx,
         args.userId,
-        { ...answer, category: finalName(answer.category) },
+        {
+          merchantPattern: answer.merchantPattern,
+          category: finalName(answer.category),
+          isSubscription: answer.isSubscription,
+          excludeFromAnalysis: answer.exclude === true,
+        },
         "onboarding"
       );
     }
 
     // 2. Update the user's transactions: first apply answers by merchantPattern,
     //    then apply renames to every remaining transaction of a renamed category.
+    //    Track every FINAL category in use — the taxonomy must know all of them,
+    //    not just the ones the user confirmed in questions (otherwise the
+    //    recategorize dropdown only offers the seed categories).
     const txs = await ctx.db
       .query("transactions")
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .take(4000);
+
+    const usedCategoryCounts = new Map<string, number>();
+    const countUse = (cat: string) =>
+      usedCategoryCounts.set(cat, (usedCategoryCounts.get(cat) ?? 0) + 1);
 
     for (const tx of txs) {
       const normalized = tx.merchantPattern ?? normalizeMerchant(tx.description);
@@ -193,13 +216,22 @@ export const saveOnboardingRules = mutation({
       );
 
       if (answer) {
+        const cat = finalName(answer.category);
         await ctx.db.patch(tx._id, {
-          category: finalName(answer.category),
+          category: cat,
           merchantPattern: answer.merchantPattern,
           categorySource: "rule",
+          // "no contabilizar" → out of dashboard, totals and insights
+          ...(answer.exclude === true ? { excluded: true } : {}),
         });
+        // Excluded merchants shouldn't force their category into the taxonomy
+        if (answer.exclude !== true) countUse(cat);
       } else if (renameMap.has(tx.category)) {
-        await ctx.db.patch(tx._id, { category: renameMap.get(tx.category)! });
+        const cat = renameMap.get(tx.category)!;
+        await ctx.db.patch(tx._id, { category: cat });
+        countUse(cat);
+      } else {
+        countUse(tx.category);
       }
     }
 
@@ -216,11 +248,16 @@ export const saveOnboardingRules = mutation({
       }
     }
 
-    // 4. Keep the dashboard taxonomy coherent with the confirmed categories
+    // 4. Keep the dashboard taxonomy coherent with EVERY category in use:
+    //    answers, renames and whatever the AI assigned during processing.
+    //    Most-used first so the 15-category cap never drops a relevant one.
     const usedNames = [
       ...new Set([
-        ...args.answers.map((a) => finalName(a.category)),
+        ...args.answers.filter((a) => a.exclude !== true).map((a) => finalName(a.category)),
         ...renames.map((r) => r.to),
+        ...[...usedCategoryCounts.entries()]
+          .sort((a, b) => b[1] - a[1])
+          .map(([name]) => name),
       ]),
     ];
     await syncTaxonomy(ctx, args.userId, usedNames, renames);
@@ -237,6 +274,24 @@ export const saveOnboardingRules = mutation({
     }
 
     return null;
+  },
+});
+
+// One-off backfill: users who onboarded before the taxonomy fix have
+// transactions with categories the taxonomy doesn't know. Run with:
+//   npx convex run categoryRules:backfillTaxonomyFromTransactions '{"userId":"..."}'
+export const backfillTaxonomyFromTransactions = internalMutation({
+  args: { userId: v.string() },
+  handler: async (ctx, args) => {
+    const txs = await ctx.db
+      .query("transactions")
+      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .take(4000);
+    const counts = new Map<string, number>();
+    for (const t of txs) counts.set(t.category, (counts.get(t.category) ?? 0) + 1);
+    const names = [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([n]) => n);
+    await syncTaxonomy(ctx, args.userId, names, []);
+    return names;
   },
 });
 

@@ -6,6 +6,7 @@ import { getCategoryColor } from "@/lib/taxonomy";
 export type CategorySummaryRow = {
   name: string;
   amount: number;
+  count: number; // number of transactions in the category
   pct: number;
   bar: number; // 0-100 relative to the largest category
 };
@@ -135,6 +136,17 @@ export function CategorySummary({
                 />
               </div>
 
+              <span
+                style={{
+                  fontSize: 11.5,
+                  color: "var(--text3)",
+                  flexShrink: 0,
+                  textAlign: "right",
+                  minWidth: 56,
+                }}
+              >
+                {row.count} {row.count === 1 ? "mov." : "movs."}
+              </span>
               <span
                 style={{
                   fontSize: 12.5,

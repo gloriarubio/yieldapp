@@ -32,6 +32,8 @@ export type TxRow = {
   merchant?: string;
   merchantPattern?: string;
   categorySource?: "rule" | "ai" | "manual";
+  // Set by "no contabilizar" rules — kept out of dashboard and analyses
+  excluded?: boolean;
 };
 
 // Taxonomy shape as returned by getUserTaxonomyInternal (subset we use here)
@@ -196,6 +198,7 @@ async function categorizeAndFinalize(
       merchantPattern: r.merchantPattern,
       category: r.category,
       isSubscription: r.isSubscription,
+      excludeFromAnalysis: r.excludeFromAnalysis === true,
     }))
   );
 
@@ -238,11 +241,12 @@ async function categorizeAndFinalize(
     }));
   }
 
-  // isSubscription lives on the rule, not on the transaction row
+  // isSubscription lives on the rule, not on the transaction row;
+  // excludeFromAnalysis becomes the transaction's excluded flag
   const ruleRows: TxRow[] = byRule.map((t) => {
-    const { isSubscription, ...row } = t;
+    const { isSubscription, excludeFromAnalysis, ...row } = t;
     void isSubscription;
-    return row;
+    return excludeFromAnalysis ? { ...row, excluded: true } : row;
   });
   transactions = [...ruleRows, ...aiRows];
 

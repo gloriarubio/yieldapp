@@ -6,8 +6,10 @@ import { useAction, useMutation, useQuery } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { Id } from "@convex/_generated/dataModel";
 import {
+  detectSpecialMovements,
   getAmbiguousMerchants,
   resolveMerchantCategories,
+  ONBOARDING_CATEGORIES,
   type AICategorization,
   type AmbiguousMerchantGroup,
 } from "@/lib/categorization";
@@ -167,8 +169,13 @@ export function OnboardingWizard({ userId }: { userId: string }) {
     setFinalCounts((c) => ({ ...c, subscriptions: subPatterns.size }));
     await sleep(450);
 
-    // 3. Build the ambiguous-merchant questions
+    // 3. Build the questions: block A (recurring transfers/Bizum — only the
+    //    user knows if they're savings, rent or shouldn't count) first, then
+    //    block B (ambiguous merchants), skipping patterns already in A.
     setFinalStage(2);
+    const specials = detectSpecialMovements(all);
+    const specialPatterns = new Set(specials.map((g) => g.merchantPattern));
+
     const aiResults: AICategorization[] = all
       .filter((t) => t.categorySource === "ai")
       .map((t) => ({
@@ -178,27 +185,29 @@ export function OnboardingWizard({ userId }: { userId: string }) {
         confidence: t.confidence,
         merchantPattern: t.merchantPattern,
       }));
-    const ambiguous = getAmbiguousMerchants(aiResults, all);
-    setFinalCounts((c) => ({ ...c, questions: ambiguous.length }));
+    const ambiguous = getAmbiguousMerchants(aiResults, all, 10, specialPatterns);
+    const allQuestions = [...specials, ...ambiguous];
+    setFinalCounts((c) => ({ ...c, questions: allQuestions.length }));
     await sleep(450);
     setFinalStage(3);
 
-    // Preselect Claude's suggestion on every question
+    // Preselect Claude's suggestion on every question. Transfers preselect
+    // "Transferencias" (the safe default) — the pills invite a better answer.
     const preset: Record<string, MerchantAnswer> = {};
-    for (const g of ambiguous) {
+    for (const g of allQuestions) {
       preset[g.merchantPattern] = {
-        category: g.suggestedCategories[0],
+        category: g.kind === "transfer" ? "Transferencias" : g.suggestedCategories[0],
         isSubscription: g.isSubscriptionCandidate,
       };
     }
 
     setTransactions(all);
-    setGroups(ambiguous);
+    setGroups(allQuestions);
     setAnswers(preset);
     setQuestionPage(0);
 
     await sleep(300);
-    setStep(ambiguous.length > 0 ? 3 : 4);
+    setStep(allQuestions.length > 0 ? 3 : 4);
   }
 
   // ── Step 3: questions ──────────────────────────────────────────────────────
@@ -219,29 +228,50 @@ export function OnboardingWizard({ userId }: { userId: string }) {
     }
   }
 
+  // Every category the user can pick in a question's "Otra categoría…":
+  // the onboarding list + whatever appeared in the data + custom answers
+  const allCategories: string[] = useMemo(() => {
+    return [
+      ...new Set([
+        ...ONBOARDING_CATEGORIES,
+        "Ahorro",
+        "Vivienda",
+        ...transactions.map((t) => t.category),
+        ...Object.values(answers).map((a) => a.category),
+      ]),
+    ].sort((a, b) => a.localeCompare(b, "es"));
+  }, [transactions, answers]);
+
   // ── Step 4: summary + renames ──────────────────────────────────────────────
 
-  // Category of a transaction once the user's answers are applied
-  function effectiveCategory(tx: ProcessedTx): string {
+  // Category of a transaction once the user's answers are applied;
+  // null when the user chose "no contabilizar" for its merchant
+  function effectiveCategory(tx: ProcessedTx): string | null {
     const ans = answers[tx.merchantPattern];
+    if (ans?.exclude) return null;
     const base = ans ? ans.category : tx.category;
     return renames[base] ?? base;
   }
 
   const summaryRows: CategorySummaryRow[] = useMemo(() => {
-    const totals = new Map<string, number>();
+    const totals = new Map<string, { amount: number; count: number }>();
     for (const tx of transactions) {
       if (tx.amount >= 0) continue;
       const cat = effectiveCategory(tx);
-      totals.set(cat, (totals.get(cat) ?? 0) + Math.abs(tx.amount));
+      if (cat === null) continue; // excluded by the user
+      const entry = totals.get(cat) ?? { amount: 0, count: 0 };
+      entry.amount += Math.abs(tx.amount);
+      entry.count++;
+      totals.set(cat, entry);
     }
-    const total = [...totals.values()].reduce((a, b) => a + b, 0);
+    const total = [...totals.values()].reduce((a, b) => a + b.amount, 0);
     if (total === 0) return [];
-    const max = Math.max(...totals.values());
+    const max = Math.max(...[...totals.values()].map((t) => t.amount));
     return [...totals.entries()]
-      .map(([name, amount]) => ({
+      .map(([name, { amount, count }]) => ({
         name,
         amount,
+        count,
         pct: Math.round((amount / total) * 100),
         bar: Math.round((amount / max) * 100),
       }))
@@ -273,6 +303,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
           merchantPattern: g.merchantPattern,
           category: answers[g.merchantPattern].category,
           isSubscription: answers[g.merchantPattern].isSubscription,
+          exclude: answers[g.merchantPattern].exclude === true,
         })),
         renames: Object.entries(renames)
           .filter(([from, to]) => to.trim() && from !== to)
@@ -528,10 +559,11 @@ export function OnboardingWizard({ userId }: { userId: string }) {
         <>
           <div>
             <h2 style={{ fontSize: 24, fontWeight: 500, letterSpacing: "-0.5px", color: "var(--text)", marginBottom: 8, fontFamily: "var(--font-playfair), Georgia, serif" }}>
-              Ayúdanos con estos comercios
+              Unas pocas decisiones que solo tú puedes tomar
             </h2>
             <p style={{ fontSize: 14, color: "var(--text2)", lineHeight: 1.6 }}>
-              No estamos seguros de cómo clasificar estos gastos. Confirma la categoría de cada uno
+              La IA ha categorizado todo lo demás. Aquí están los movimientos donde tu criterio
+              importa: transferencias, comercios dudosos y posibles suscripciones
               {totalPages > 1 && ` (página ${questionPage + 1} de ${totalPages})`}.
             </p>
           </div>
@@ -542,6 +574,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
                 key={g.merchantPattern}
                 group={g}
                 answer={answers[g.merchantPattern]}
+                allCategories={allCategories}
                 onAnswer={(a) => setAnswers((prev) => ({ ...prev, [g.merchantPattern]: a }))}
               />
             ))}

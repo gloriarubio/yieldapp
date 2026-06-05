@@ -101,6 +101,9 @@ export default defineSchema({
     category: v.string(),
     // true if the user marked it as a recurring subscription.
     isSubscription: v.boolean(),
+    // true = the user chose "no contabilizar": future transactions of this
+    // merchant are inserted with excluded: true (kept out of all analyses)
+    excludeFromAnalysis: v.optional(v.boolean()),
     source: v.union(
       v.literal("onboarding"),  // from the initial wizard
       v.literal("user_edit")    // from a later manual correction
