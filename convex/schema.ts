@@ -224,6 +224,17 @@ export default defineSchema({
     .index("by_auth_id", ["id"])
     .index("by_email", ["email"]),
 
+  // Signing keys for Better Auth's `jwt` plugin (issues the JWT Convex verifies).
+  // Managed by the Better Auth adapter (convex/betterAuth.ts), like the other
+  // auth tables. Dates are strings (adapter supportsDates: false).
+  jwks: defineTable({
+    id: v.string(),
+    publicKey: v.string(),
+    privateKey: v.string(),
+    createdAt: v.string(),
+    expiresAt: v.optional(v.string()),
+  }).index("by_auth_id", ["id"]),
+
   session: defineTable({
     id: v.string(),
     token: v.string(),

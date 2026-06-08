@@ -89,6 +89,8 @@ async function getAllDocs(db: any, model: string): Promise<any[]> {
       return db.query("account").collect();
     case "verification":
       return db.query("verification").collect();
+    case "jwks":
+      return db.query("jwks").collect();
     default:
       throw new Error(`Unknown auth model: ${model}`);
   }
@@ -116,6 +118,9 @@ export const dbCreate = mutation({
         break;
       case "verification":
         await ctx.db.insert("verification", data);
+        break;
+      case "jwks":
+        await ctx.db.insert("jwks", data);
         break;
       default:
         throw new Error(`Unknown auth model: ${model}`);

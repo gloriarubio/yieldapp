@@ -14,6 +14,7 @@ import type * as apiKeys from "../apiKeys.js";
 import type * as apiQueries from "../apiQueries.js";
 import type * as assistant from "../assistant.js";
 import type * as assistantActions from "../assistantActions.js";
+import type * as authz from "../authz.js";
 import type * as betterAuth from "../betterAuth.js";
 import type * as categoryRules from "../categoryRules.js";
 import type * as http from "../http.js";
@@ -46,6 +47,7 @@ declare const fullApi: ApiFromModules<{
   apiQueries: typeof apiQueries;
   assistant: typeof assistant;
   assistantActions: typeof assistantActions;
+  authz: typeof authz;
   betterAuth: typeof betterAuth;
   categoryRules: typeof categoryRules;
   http: typeof http;

@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { jwt } from "better-auth/plugins";
 import { convexAuthAdapter } from "./convex-auth-adapter";
 
 // Origins Better Auth will accept (CSRF protection). Without the production
@@ -32,4 +33,9 @@ export const auth = betterAuth({
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     },
   },
+  // Exposes /api/auth/jwks + /api/auth/token so Convex can verify the user's
+  // identity (see convex/auth.config.ts). The JWT `sub` is the user id and
+  // `iss` is baseURL. RS256 because Convex Custom JWT does not support the
+  // plugin's default EdDSA. Additive — does not change existing auth behaviour.
+  plugins: [jwt({ jwks: { keyPairConfig: { alg: "RS256" } } })],
 });
