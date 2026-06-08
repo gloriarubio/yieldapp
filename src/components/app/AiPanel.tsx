@@ -2,18 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useQuery } from "convex/react";
+import { useQuery, useAction } from "convex/react";
 import { api } from "@convex/_generated/api";
 import { authClient } from "@/lib/auth-client";
 
 const SUGGESTIONS = [
   "¿En qué categoría gasto más?",
-  "¿Cuánto llevo en Amazon?",
-  "¿Cuándo puedo ahorrar 3.000€?",
+  "¿Qué categorías suben y cuáles bajan estos meses?",
+  "¿Cuál es mi mayor gasto de todo el periodo?",
+  "¿Qué mes ha sido el mejor en ahorro?",
 ];
-
-const BOT_REPLY =
-  "Tu mayor gasto en mayo es Supermercado con 502€, un 23% del total. Subió un 12% respecto a abril. Te propongo 3 acciones concretas para reducirlo el mes que viene.";
 
 interface Message {
   role: "user" | "bot";
@@ -26,6 +24,7 @@ export function AiPanel() {
   const [typing, setTyping] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const ask = useAction(api.assistantActions.ask);
 
   // El asistente conversacional es una función Pro
   const subscription = useQuery(
@@ -44,16 +43,28 @@ export function AiPanel() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, typing]);
 
-  function send(text: string) {
+  async function send(text: string) {
     const q = text.trim();
-    if (!q) return;
+    if (!q || typing || !userId) return;
+    // Snapshot the prior conversation as history for follow-up questions
+    const history = messages.map((m) => ({
+      role: m.role === "user" ? ("user" as const) : ("assistant" as const),
+      text: m.text,
+    }));
     setMessages((m) => [...m, { role: "user", text: q }]);
     setInput("");
     setTyping(true);
-    setTimeout(() => {
+    try {
+      const answer = await ask({ userId, question: q, history });
+      setMessages((m) => [...m, { role: "bot", text: answer }]);
+    } catch {
+      setMessages((m) => [
+        ...m,
+        { role: "bot", text: "Ups, no he podido responder. Inténtalo de nuevo en un momento." },
+      ]);
+    } finally {
       setTyping(false);
-      setMessages((m) => [...m, { role: "bot", text: BOT_REPLY }]);
-    }, 1600);
+    }
   }
 
   function clear() {
