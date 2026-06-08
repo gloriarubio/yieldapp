@@ -1,6 +1,6 @@
 import { httpRouter } from "convex/server";
 import { httpAction, ActionCtx } from "./_generated/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { Id } from "./_generated/dataModel";
 import { sha256Hex } from "./apiKeyUtils";
 import { subscriptionIsPro } from "./subscriptionHelpers";
@@ -198,7 +198,7 @@ http.route({
 
     // Processing takes minutes — respond 202 and let the client poll
     // GET /v1/statements/{id} until status === "done"
-    await ctx.scheduler.runAfter(0, api.process.processStatement, {
+    await ctx.scheduler.runAfter(0, internal.process.processStatementInternal, {
       storageId,
       userId: auth.userId,
       filename,
@@ -219,7 +219,7 @@ http.route({
     const auth = await authenticate(ctx, req);
     if (auth instanceof Response) return auth;
 
-    const statements = await ctx.runQuery(api.statements.listStatements, {
+    const statements = await ctx.runQuery(internal.statements.listStatementsInternal, {
       userId: auth.userId,
     });
     return json(200, { items: statements.map(statementToJson) });
@@ -238,7 +238,7 @@ http.route({
     const id = new URL(req.url).pathname.split("/").pop() ?? "";
     let statement;
     try {
-      statement = await ctx.runQuery(api.statements.getStatementById, {
+      statement = await ctx.runQuery(internal.statements.getStatementByIdInternal, {
         statementId: id as Id<"statements">,
       });
     } catch {
@@ -314,7 +314,7 @@ http.route({
     });
 
     // Categorization (rules + Claude) runs async — poll GET /v1/statements/{id}
-    await ctx.scheduler.runAfter(0, api.process.processApiTransactions, {
+    await ctx.scheduler.runAfter(0, internal.process.processApiTransactions, {
       userId: auth.userId,
       statementId,
       transactions,
@@ -406,7 +406,7 @@ http.route({
       return apiError(400, "invalid_param", "Falta el parámetro 'month' (YYYY-MM).");
     }
 
-    const existing = await ctx.runQuery(api.insights.getMonthInsights, {
+    const existing = await ctx.runQuery(internal.insights.getMonthInsightsInternal, {
       userId: auth.userId,
       month,
     });
@@ -416,7 +416,7 @@ http.route({
 
     // ?generate=true → generate on demand (takes a few seconds)
     if (params.get("generate") === "true") {
-      const insights = await ctx.runAction(api.insightsActions.generateMonthInsights, {
+      const insights = await ctx.runAction(internal.insightsActions.generateMonthInsightsInternal, {
         userId: auth.userId,
         month,
       });
@@ -439,7 +439,7 @@ http.route({
     const auth = await authenticate(ctx, req);
     if (auth instanceof Response) return auth;
 
-    const taxonomy = await ctx.runQuery(api.taxonomy.getUserTaxonomy, {
+    const taxonomy = await ctx.runQuery(internal.taxonomy.getUserTaxonomyInternal, {
       userId: auth.userId,
     });
     // Before the first upload the user has no taxonomy yet — expose the seeds

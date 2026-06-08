@@ -1,8 +1,9 @@
 "use node";
 
-import { action, ActionCtx } from "./_generated/server";
+import { action, internalAction, ActionCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { requireUserId } from "./authz";
 import { Id } from "./_generated/dataModel";
 import Anthropic from "@anthropic-ai/sdk";
 import * as XLSX from "xlsx";
@@ -42,7 +43,29 @@ type TaxonomyDoc = {
   lastExpansionAt?: number;
 } | null;
 
+// Public wrapper called by the web upload: derives the user from the verified
+// session and runs the internal processor with that identity (IDOR fix).
 export const processStatement = action({
+  args: {
+    storageId: v.id("_storage"),
+    userId: v.optional(v.string()), // accepted for backward compat, ignored
+    filename: v.string(),
+    fileType: v.union(v.literal("pdf"), v.literal("csv"), v.literal("excel")),
+  },
+  handler: async (ctx, args): Promise<{ statementId: Id<"statements">; transactionCount: number }> => {
+    const userId = await requireUserId(ctx);
+    return await ctx.runAction(internal.process.processStatementInternal, {
+      storageId: args.storageId,
+      userId,
+      filename: args.filename,
+      fileType: args.fileType,
+    });
+  },
+});
+
+// Internal processor. Trusted callers (the web wrapper above with a verified
+// userId, and convex/http.ts for the API with the key-derived userId) only.
+export const processStatementInternal = internalAction({
   args: {
     storageId: v.id("_storage"),
     userId: v.string(),
@@ -120,7 +143,9 @@ export const processStatement = action({
 // JSON transactions pushed via POST /v1/transactions (no file involved).
 // They go through the exact same learning pipeline as file uploads:
 // user rules → Claude for the rest → consolidation → notifications.
-export const processApiTransactions = action({
+// API-only (convex/http.ts schedules it with the key-derived userId). Internal
+// so a web client can't inject transactions into another user's account.
+export const processApiTransactions = internalAction({
   args: {
     userId: v.string(),
     statementId: v.id("statements"),

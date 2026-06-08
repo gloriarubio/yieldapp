@@ -10,19 +10,21 @@ import {
   computeCategoryStats,
   detectSubscriptions,
 } from "../src/lib/projections";
+import { requireUserId } from "./authz";
 
 // Claude evaluates the user's savings plan for FEASIBILITY: are the simulated
 // cuts realistic given the spending history, and what better levers exist?
 // The verdict is cached on the plan document (see projections.saveAiVerdict).
 export const evaluateProjectionPlan = action({
-  args: { userId: v.string() },
-  handler: async (ctx, args): Promise<string> => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx): Promise<string> => {
+    const userId = await requireUserId(ctx);
     const [plan, allTxs]: [
       Doc<"projection_plans"> | null,
       Doc<"transactions">[]
     ] = await Promise.all([
-      ctx.runQuery(internal.projections.getProjectionPlanInternal, { userId: args.userId }),
-      ctx.runQuery(internal.transactions.getAllTransactionsInternal, { userId: args.userId }),
+      ctx.runQuery(internal.projections.getProjectionPlanInternal, { userId }),
+      ctx.runQuery(internal.transactions.getAllTransactionsInternal, { userId }),
     ]);
 
     if (allTxs.length === 0) throw new Error("No hay transacciones que analizar");
@@ -90,7 +92,7 @@ Sin saludos, sin markdown, sin listas — solo el texto del veredicto.`,
     if (!text) throw new Error("No se pudo generar el análisis");
 
     await ctx.runMutation(internal.projections.saveAiVerdict, {
-      userId: args.userId,
+      userId,
       text,
     });
 

@@ -1,5 +1,6 @@
 import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireUserId } from "./authz";
 
 // ─── Validators ──────────────────────────────────────────────────────────────
 
@@ -92,11 +93,12 @@ export const SEED_CATEGORIES = [
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
 export const getUserTaxonomy = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     return await ctx.db
       .query("userTaxonomy")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .unique();
   },
 });

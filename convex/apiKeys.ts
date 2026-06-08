@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { generateApiKey, keyPrefix, sha256Hex } from "./apiKeyUtils";
 import { subscriptionIsPro } from "./subscriptionHelpers";
+import { requireUserId } from "./authz";
 
 // Personal API keys for the public HTTP API (see convex/http.ts).
 // The plaintext key is generated in an action (mutations must stay
@@ -14,11 +15,12 @@ const MAX_KEYS_PER_USER = 10;
 // ─── Settings UI ─────────────────────────────────────────────────────────────
 
 export const listApiKeys = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     const keys = await ctx.db
       .query("api_keys")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .order("desc")
       .take(50);
     // Never expose the hash to the client
@@ -34,12 +36,13 @@ export const listApiKeys = query({
 });
 
 export const createApiKey = action({
-  args: { userId: v.string(), name: v.string() },
+  args: { userId: v.optional(v.string()), name: v.string() },
   handler: async (ctx, args): Promise<{ key: string; prefix: string }> => {
+    const userId = await requireUserId(ctx);
     // "API + automatizaciones" is a Pro feature — existing keys keep working
     // (read access), but creating new ones requires an active subscription
     const sub = await ctx.runQuery(internal.subscriptions.getSubscriptionInternal, {
-      userId: args.userId,
+      userId,
     });
     if (!subscriptionIsPro(sub)) {
       throw new Error("La API requiere el plan Pro. Actívalo en Ajustes → Suscripción.");
@@ -48,7 +51,7 @@ export const createApiKey = action({
     const key = generateApiKey();
     const prefix = keyPrefix(key);
     await ctx.runMutation(internal.apiKeys.insertApiKey, {
-      userId: args.userId,
+      userId,
       name: args.name.trim() || "API key",
       keyHash: await sha256Hex(key),
       prefix,
@@ -59,10 +62,11 @@ export const createApiKey = action({
 });
 
 export const revokeApiKey = mutation({
-  args: { userId: v.string(), keyId: v.id("api_keys") },
+  args: { userId: v.optional(v.string()), keyId: v.id("api_keys") },
   handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
     const key = await ctx.db.get(args.keyId);
-    if (!key || key.userId !== args.userId) {
+    if (!key || key.userId !== userId) {
       throw new Error("Clave no encontrada");
     }
     await ctx.db.patch(args.keyId, { revokedAt: Date.now() });

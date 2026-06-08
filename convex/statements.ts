@@ -1,5 +1,6 @@
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireUserId } from "./authz";
 
 const insightValidator = v.object({
   type: v.union(v.literal("warning"), v.literal("trend"), v.literal("suggestion")),
@@ -9,6 +10,7 @@ const insightValidator = v.object({
 export const generateUploadUrl = mutation({
   args: {},
   handler: async (ctx) => {
+    await requireUserId(ctx); // only authenticated users may get an upload URL
     return await ctx.storage.generateUploadUrl();
   },
 });
@@ -75,7 +77,10 @@ export const updateStatementProgress = internalMutation({
 export const getStatementById = query({
   args: { statementId: v.id("statements") },
   handler: async (ctx, args) => {
-    return await ctx.db.get(args.statementId);
+    const userId = await requireUserId(ctx);
+    const statement = await ctx.db.get(args.statementId);
+    if (!statement || statement.userId !== userId) return null; // not yours
+    return statement;
   },
 });
 
@@ -90,6 +95,20 @@ export const updateInsights = internalMutation({
 });
 
 export const listStatements = query({
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    return await ctx.db
+      .query("statements")
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
+      .order("desc")
+      .take(50);
+  },
+});
+
+// Internal variants for the public HTTP API (convex/http.ts), which is
+// authenticated by API key (no session) and passes a trusted userId.
+export const listStatementsInternal = internalQuery({
   args: { userId: v.string() },
   handler: async (ctx, args) => {
     return await ctx.db
@@ -97,5 +116,12 @@ export const listStatements = query({
       .withIndex("by_userId", (q) => q.eq("userId", args.userId))
       .order("desc")
       .take(50);
+  },
+});
+
+export const getStatementByIdInternal = internalQuery({
+  args: { statementId: v.id("statements") },
+  handler: async (ctx, args) => {
+    return await ctx.db.get(args.statementId);
   },
 });

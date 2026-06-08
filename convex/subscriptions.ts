@@ -1,6 +1,7 @@
 import { internalMutation, internalQuery, query, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { subscriptionIsPro } from "./subscriptionHelpers";
+import { requireUserId } from "./authz";
 
 // Stripe subscription state per user. The webhook (convex/http.ts →
 // stripeActions.processStripeWebhook) is the single writer; the UI and the
@@ -16,9 +17,10 @@ async function getByUserId(ctx: QueryCtx, userId: string) {
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 export const getSubscription = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
-    const sub = await getByUserId(ctx, args.userId);
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    const sub = await getByUserId(ctx, userId);
     return {
       plan: subscriptionIsPro(sub) ? ("pro" as const) : ("free" as const),
       interval: sub?.interval ?? null,

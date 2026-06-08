@@ -1,5 +1,6 @@
 import { internalMutation, internalQuery, mutation, query, QueryCtx } from "./_generated/server";
 import { v } from "convex/values";
+import { requireUserId } from "./authz";
 
 // Savings plan for /app/proyecciones — one document per user, autosaved by
 // the page so the goal and the simulation survive sessions.
@@ -20,9 +21,10 @@ async function getByUserId(ctx: QueryCtx, userId: string) {
 }
 
 export const getProjectionPlan = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
-    return await getByUserId(ctx, args.userId);
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
+    return await getByUserId(ctx, userId);
   },
 });
 
@@ -34,9 +36,10 @@ export const getProjectionPlanInternal = internalQuery({
 });
 
 export const saveProjectionPlan = mutation({
-  args: { userId: v.string(), ...planFields },
+  args: { userId: v.optional(v.string()), ...planFields },
   handler: async (ctx, args) => {
-    const { userId, ...fields } = args;
+    const userId = await requireUserId(ctx);
+    const { userId: _ignored, ...fields } = args;
     const existing = await getByUserId(ctx, userId);
     if (existing) {
       await ctx.db.patch(existing._id, { ...fields, updatedAt: Date.now() });

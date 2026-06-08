@@ -3,6 +3,7 @@ import { v } from "convex/values";
 import { Id } from "./_generated/dataModel";
 import { resolveMerchantCategories } from "../src/lib/categorization";
 import { normalizeDate } from "../src/lib/dates";
+import { requireUserId } from "./authz";
 
 const transactionValidator = v.object({
   userId: v.string(),
@@ -32,23 +33,26 @@ export const insertTransactions = internalMutation({
 
 export const listTransactions = query({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     statementId: v.optional(v.id("statements")),
   },
   handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
     // 2000 covers a multi-month onboarding (the old 500 silently hid most of
     // the first uploaded file — it looked like only one file was processed).
     // TODO: paginate or filter by month server-side when volumes grow.
     if (args.statementId) {
-      return await ctx.db
+      const rows = await ctx.db
         .query("transactions")
         .withIndex("by_statementId", (q) => q.eq("statementId", args.statementId as Id<"statements">))
         .order("desc")
         .take(2000);
+      // Only return rows that belong to the caller (a statementId could be guessed)
+      return rows.filter((t) => t.userId === userId);
     }
     return await ctx.db
       .query("transactions")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .order("desc")
       .take(2000);
   },
@@ -205,7 +209,7 @@ async function consolidate(
 
 export const consolidateMerchantCategories = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     // Optional explicit pattern → category map (the onboarding wizard passes
     // the same resolution it shows the user, so UI and DB always agree)
     assignments: v.optional(
@@ -213,7 +217,8 @@ export const consolidateMerchantCategories = mutation({
     ),
   },
   handler: async (ctx, args) => {
-    return await consolidate(ctx, args.userId, args.assignments);
+    const userId = await requireUserId(ctx);
+    return await consolidate(ctx, userId, args.assignments);
   },
 });
 
@@ -231,6 +236,9 @@ export const setTransactionExcluded = mutation({
     excluded: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
+    const tx = await ctx.db.get(args.transactionId);
+    if (!tx || tx.userId !== userId) return null; // not yours
     await ctx.db.patch(args.transactionId, { excluded: args.excluded });
     return null;
   },

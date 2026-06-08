@@ -8,6 +8,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { extractFromPdf, extractFromStructuredFile, type TxRow } from "./process";
 import { applyUserRules, ONBOARDING_CATEGORIES } from "../src/lib/categorization";
 import { categorizeWithAI } from "../src/lib/categorization-ai";
+import { requireUserId } from "./authz";
 
 export type OnboardingTxResult = {
   date: string;
@@ -32,7 +33,7 @@ export type OnboardingTxResult = {
 // reuse that pipeline instead.
 export const processOnboardingStatement = action({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     storageId: v.id("_storage"),
     filename: v.string(),
     fileType: v.union(v.literal("pdf"), v.literal("csv"), v.literal("excel")),
@@ -41,10 +42,11 @@ export const processOnboardingStatement = action({
     ctx,
     args
   ): Promise<{ statementId: Id<"statements">; transactions: OnboardingTxResult[] }> => {
+    const userId = await requireUserId(ctx);
     const statementId: Id<"statements"> = await ctx.runMutation(
       internal.statements.createStatement,
       {
-        userId: args.userId,
+        userId: userId,
         storageId: args.storageId,
         filename: args.filename,
         fileType: args.fileType,
@@ -66,10 +68,10 @@ export const processOnboardingStatement = action({
       const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
       const extracted: TxRow[] =
         args.fileType === "pdf"
-          ? await extractFromPdf(blob, args.userId, statementId, anthropic, [
+          ? await extractFromPdf(blob, userId, statementId, anthropic, [
               ...ONBOARDING_CATEGORIES,
             ])
-          : await extractFromStructuredFile(blob, args.fileType, args.userId, statementId);
+          : await extractFromStructuredFile(blob, args.fileType, userId, statementId);
 
       await ctx.runMutation(internal.statements.updateStatementProgress, {
         statementId,
@@ -84,7 +86,7 @@ export const processOnboardingStatement = action({
       // 2. Apply existing user rules (empty during a fresh onboarding)
       const rules: Doc<"category_rules">[] = await ctx.runQuery(
         internal.categoryRules.getUserRulesInternal,
-        { userId: args.userId }
+        { userId: userId }
       );
       const { categorized: byRule, uncategorized } = applyUserRules(
         extracted,
@@ -164,7 +166,7 @@ export const processOnboardingStatement = action({
       );
       const count: number = await ctx.runMutation(internal.transactions.insertTransactions, {
         transactions: results.map((r) => ({
-          userId: args.userId,
+          userId: userId,
           statementId,
           date: r.date,
           description: r.description,

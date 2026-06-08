@@ -1,10 +1,11 @@
 "use node";
 
-import { action } from "./_generated/server";
+import { action, internalAction } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Doc } from "./_generated/dataModel";
 import Anthropic from "@anthropic-ai/sdk";
+import { requireUserId } from "./authz";
 
 const MONTH_NAMES_ES = [
   "enero","febrero","marzo","abril","mayo","junio",
@@ -17,7 +18,21 @@ type InsightRow = { type: "warning" | "trend" | "suggestion"; text: string };
 // transactions (a statement file can span several months, so insights are
 // keyed by month, never by statement). Triggered on demand from the
 // dashboard's "Generar análisis" button.
+// Public wrapper (dashboard): verified identity → internal generator.
 export const generateMonthInsights = action({
+  args: { userId: v.optional(v.string()), month: v.string() },
+  handler: async (ctx, args): Promise<InsightRow[] | null> => {
+    const userId = await requireUserId(ctx);
+    return await ctx.runAction(internal.insightsActions.generateMonthInsightsInternal, {
+      userId,
+      month: args.month,
+    });
+  },
+});
+
+// Internal generator (the web wrapper above and convex/http.ts API call it,
+// both with an already-trusted userId).
+export const generateMonthInsightsInternal = internalAction({
   args: {
     userId: v.string(),
     month: v.string(), // "YYYY-MM"
@@ -107,11 +122,12 @@ Responde ÚNICAMENTE con un array JSON válido, sin markdown, sin texto adiciona
 // month, a single global look at ALL the user's uploaded data. Stored in
 // monthlyInsights under the sentinel month "all".
 export const generatePeriodInsights = action({
-  args: { userId: v.string() },
-  handler: async (ctx, args): Promise<InsightRow[] | null> => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx): Promise<InsightRow[] | null> => {
+    const userId = await requireUserId(ctx);
     const allTxs: Doc<"transactions">[] = await ctx.runQuery(
       internal.transactions.getAllTransactionsInternal,
-      { userId: args.userId }
+      { userId }
     );
     const txs = allTxs.filter((t) => t.excluded !== true);
 
@@ -197,7 +213,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin markdown, sin texto adiciona
     }
 
     await ctx.runMutation(internal.insights.saveMonthInsights, {
-      userId: args.userId,
+      userId,
       month: "all", // sentinel: whole-period insights (Free plan)
       insights,
     });

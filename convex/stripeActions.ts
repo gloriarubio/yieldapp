@@ -3,6 +3,7 @@
 import { action, internalAction, ActionCtx } from "./_generated/server";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
+import { requireUserId } from "./authz";
 import Stripe from "stripe";
 
 // Stripe lives entirely server-side: Checkout + Customer Portal for the
@@ -70,10 +71,11 @@ async function syncSubscription(
 
 export const createCheckoutSession = action({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     interval: v.union(v.literal("month"), v.literal("year")),
   },
   handler: async (ctx, args): Promise<{ url: string }> => {
+    const userId = await requireUserId(ctx);
     const stripe = getStripe();
 
     // Resolve the price by lookup key (created by setupStripeProducts)
@@ -91,21 +93,21 @@ export const createCheckoutSession = action({
 
     // Reuse the Stripe customer if we already created one for this user
     const existing = await ctx.runQuery(internal.subscriptions.getSubscriptionInternal, {
-      userId: args.userId,
+      userId: userId,
     });
     let customerId = existing?.stripeCustomerId;
     if (!customerId) {
       const info = await ctx.runQuery(internal.subscriptions.getUserInfoInternal, {
-        userId: args.userId,
+        userId: userId,
       });
       const customer = await stripe.customers.create({
         email: info?.email,
         name: info?.name,
-        metadata: { userId: args.userId },
+        metadata: { userId: userId },
       });
       customerId = customer.id;
       await ctx.runMutation(internal.subscriptions.rememberStripeCustomer, {
-        userId: args.userId,
+        userId: userId,
         stripeCustomerId: customerId,
       });
     }
@@ -114,9 +116,9 @@ export const createCheckoutSession = action({
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       customer: customerId,
-      client_reference_id: args.userId,
+      client_reference_id: userId,
       line_items: [{ price: price.id, quantity: 1 }],
-      subscription_data: { metadata: { userId: args.userId } },
+      subscription_data: { metadata: { userId: userId } },
       allow_promotion_codes: true,
       success_url: `${siteUrl()}/app/ajustes?tab=suscripcion&checkout=success`,
       cancel_url: `${siteUrl()}/app/ajustes?tab=suscripcion&checkout=cancelled`,
@@ -130,11 +132,12 @@ export const createCheckoutSession = action({
 // ─── Customer Portal (manage / cancel / change payment method) ──────────────
 
 export const createPortalSession = action({
-  args: { userId: v.string() },
-  handler: async (ctx, args): Promise<{ url: string }> => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx): Promise<{ url: string }> => {
+    const userId = await requireUserId(ctx);
     const stripe = getStripe();
     const sub = await ctx.runQuery(internal.subscriptions.getSubscriptionInternal, {
-      userId: args.userId,
+      userId: userId,
     });
     if (!sub?.stripeCustomerId) {
       throw new Error("No hay cliente de Stripe para este usuario");

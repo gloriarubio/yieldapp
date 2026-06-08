@@ -2,6 +2,7 @@ import { internalMutation, internalQuery, mutation, query, MutationCtx } from ".
 import { v } from "convex/values";
 import { normalizeMerchant } from "../src/lib/categorization";
 import { SEED_CATEGORIES } from "./taxonomy";
+import { requireUserId } from "./authz";
 
 // ─── Validators ──────────────────────────────────────────────────────────────
 
@@ -21,11 +22,12 @@ const renameValidator = v.object({
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
 export const getUserRules = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     return await ctx.db
       .query("category_rules")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .take(1000);
   },
 });
@@ -166,7 +168,7 @@ async function syncTaxonomy(
 // the queries/mutations in this codebase).
 export const saveOnboardingRules = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     answers: v.array(answerValidator),
     // Cosmetic category renames done in step 4 of the wizard
     renames: v.optional(v.array(renameValidator)),
@@ -174,6 +176,7 @@ export const saveOnboardingRules = mutation({
     completeOnboarding: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
     const renames = args.renames ?? [];
     const renameMap = new Map(renames.map((r) => [r.from, r.to]));
     const finalName = (cat: string) => renameMap.get(cat) ?? cat;
@@ -184,7 +187,7 @@ export const saveOnboardingRules = mutation({
     for (const answer of args.answers) {
       await upsertRule(
         ctx,
-        args.userId,
+        userId,
         {
           merchantPattern: answer.merchantPattern,
           category: finalName(answer.category),
@@ -202,7 +205,7 @@ export const saveOnboardingRules = mutation({
     //    recategorize dropdown only offers the seed categories).
     const txs = await ctx.db
       .query("transactions")
-      .withIndex("by_userId", (q) => q.eq("userId", args.userId))
+      .withIndex("by_userId", (q) => q.eq("userId", userId))
       .take(4000);
 
     const usedCategoryCounts = new Map<string, number>();
@@ -239,7 +242,7 @@ export const saveOnboardingRules = mutation({
     if (renames.length > 0) {
       const rules = await ctx.db
         .query("category_rules")
-        .withIndex("by_user", (q) => q.eq("userId", args.userId))
+        .withIndex("by_user", (q) => q.eq("userId", userId))
         .take(1000);
       for (const rule of rules) {
         if (renameMap.has(rule.category)) {
@@ -260,13 +263,13 @@ export const saveOnboardingRules = mutation({
           .map(([name]) => name),
       ]),
     ];
-    await syncTaxonomy(ctx, args.userId, usedNames, renames);
+    await syncTaxonomy(ctx, userId, usedNames, renames);
 
     // 5. Mark onboarding as completed
     if (args.completeOnboarding !== false) {
       const user = await ctx.db
         .query("user")
-        .withIndex("by_auth_id", (q) => q.eq("id", args.userId))
+        .withIndex("by_auth_id", (q) => q.eq("id", userId))
         .unique();
       if (user) {
         await ctx.db.patch(user._id, { onboardingCompleted: true });
@@ -304,8 +307,9 @@ export const updateTransactionCategory = mutation({
     isSubscription: v.boolean(),
   },
   handler: async (ctx, args) => {
+    const userId = await requireUserId(ctx);
     const tx = await ctx.db.get(args.transactionId);
-    if (!tx) throw new Error("Transacción no encontrada");
+    if (!tx || tx.userId !== userId) throw new Error("Transacción no encontrada");
 
     const merchantPattern = tx.merchantPattern ?? normalizeMerchant(tx.description);
 

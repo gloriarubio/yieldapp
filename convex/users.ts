@@ -1,15 +1,17 @@
 import { query } from "./_generated/server";
 import { v } from "convex/values";
+import { requireUserId } from "./authz";
 
 // Used by the client guard to decide between /onboarding and the app.
-// Follows the project convention of passing the Better Auth userId from
-// the client (same as transactions/statements queries).
+// IDOR fix: the userId is the verified session subject (the optional `userId`
+// arg is accepted for backward compat but ignored).
 export const getOnboardingStatus = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     const user = await ctx.db
       .query("user")
-      .withIndex("by_auth_id", (q) => q.eq("id", args.userId))
+      .withIndex("by_auth_id", (q) => q.eq("id", userId))
       .unique();
 
     return {
