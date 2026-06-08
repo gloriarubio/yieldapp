@@ -157,6 +157,25 @@ export default defineSchema({
     updatedAt: v.number(),
   }).index("by_userId", ["userId"]),
 
+  // Conversational assistant (Pro): saved chat history so past conversations
+  // survive sessions. One row per conversation + one row per message.
+  assistant_conversations: defineTable({
+    userId: v.string(),
+    title: v.string(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  assistant_messages: defineTable({
+    conversationId: v.id("assistant_conversations"),
+    userId: v.string(),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    text: v.string(),
+    createdAt: v.number(),
+  })
+    .index("by_conversation", ["conversationId"])
+    .index("by_user", ["userId"]),
+
   // Stripe subscription state, kept in sync by the /stripe/webhook HTTP route.
   // One row per user; absence of a row (or a non-active status) means Free.
   subscriptions: defineTable({

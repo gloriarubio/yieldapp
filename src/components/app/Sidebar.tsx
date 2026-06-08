@@ -21,6 +21,16 @@ const navItems = [
     ),
   },
   {
+    label: "Asistente",
+    href: "/app/asistente",
+    icon: (
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <path d="M2 3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5v6A1.5 1.5 0 0112.5 11H6l-3 2.5V11H3.5A1.5 1.5 0 012 9.5v-6z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" opacity=".5"/>
+        <path d="M8 4.5l.7 1.8L10.5 7l-1.8.7L8 9.5l-.7-1.8L5.5 7l1.8-.7L8 4.5z" fill="currentColor"/>
+      </svg>
+    ),
+  },
+  {
     label: "Transacciones",
     href: "/app/transacciones",
     icon: (
