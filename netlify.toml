@@ -5,3 +5,15 @@
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
+
+# Baseline security headers (safe, non-breaking). A strict Content-Security-Policy
+# is intentionally omitted for now — the app relies on inline styles and Next.js
+# injects inline scripts, so a CSP needs careful, separate work.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Permissions-Policy = "geolocation=(), microphone=(), camera=()"

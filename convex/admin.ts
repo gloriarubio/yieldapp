@@ -1,10 +1,10 @@
-import { mutation } from "./_generated/server";
-import { v } from "convex/values";
+import { internalMutation } from "./_generated/server";
 
 // ─── Borrar todos los datos excepto auth ─────────────────────────────────────
-// Uso: npx convex run admin:clearAllData
+// Uso: npx convex run admin:clearAllData  (internal: solo CLI/dashboard, NUNCA
+// llamable desde un cliente público — borra datos de TODOS los usuarios)
 
-export const clearAllData = mutation({
+export const clearAllData = internalMutation({
   args: {},
   handler: async (ctx) => {
     const tables = [
