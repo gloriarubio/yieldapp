@@ -12,6 +12,7 @@ import type * as admin from "../admin.js";
 import type * as apiKeyUtils from "../apiKeyUtils.js";
 import type * as apiKeys from "../apiKeys.js";
 import type * as apiQueries from "../apiQueries.js";
+import type * as assistantActions from "../assistantActions.js";
 import type * as betterAuth from "../betterAuth.js";
 import type * as categoryRules from "../categoryRules.js";
 import type * as http from "../http.js";
@@ -42,6 +43,7 @@ declare const fullApi: ApiFromModules<{
   apiKeyUtils: typeof apiKeyUtils;
   apiKeys: typeof apiKeys;
   apiQueries: typeof apiQueries;
+  assistantActions: typeof assistantActions;
   betterAuth: typeof betterAuth;
   categoryRules: typeof categoryRules;
   http: typeof http;
