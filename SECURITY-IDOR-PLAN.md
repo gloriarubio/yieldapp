@@ -1,7 +1,32 @@
 # Plan: corregir el IDOR / Broken Access Control (auditoría jun 2026)
 
-> Estado: **pendiente** — tarea dedicada. Es la vulnerabilidad más grave de la app.
-> No empezar sin reservar tiempo y poder probar a fondo.
+> Estado: **Fase 1 COMPLETA y verificada en prod** (jun 2026). Falta la Fase 2
+> (migrar funciones). Es la vulnerabilidad más grave de la app.
+
+## ✅ Fase 1 hecha (identidad disponible en Convex)
+
+Better Auth ahora emite un JWT (plugin `jwt`, **RS256**) que Convex valida →
+`ctx.auth.getUserIdentity()` funciona. Verificado en prod: `authz:whoami`
+devuelve `{authenticated:true, subject:<userId>}`.
+
+Piezas (todas desplegadas; **aditivas**, no cambian comportamiento aún):
+- `src/lib/auth.ts`: `jwt({ jwks: { keyPairConfig: { alg: "RS256" } } })`.
+- `src/lib/auth-client.ts`: `jwtClient()`.
+- `src/components/ConvexClientProvider.tsx`: `ConvexProviderWithAuth` (token vía `/api/auth/token`; usa `getSession()` en effect — `useSession()` rompe el prerender estático).
+- `convex/auth.config.ts`: provider `customJwt` con `issuer = SITE_URL`, `jwks = SITE_URL/api/auth/jwks`, `algorithm: "RS256"`, `applicationID = issuer` (el `aud` del JWT = baseURL).
+- Tabla `jwks` + casos en `convex/betterAuth.ts` (el adaptador ahora maneja el modelo `jwks`).
+- `convex/authz.ts`: `requireUserId(ctx)` + `whoami` (temporal).
+
+**Aprendizajes clave** (gotchas que costaron):
+- Convex Custom JWT **NO soporta EdDSA** → firmar en **RS256** (push rechazado con `InvalidAuthConfig` si no).
+- `applicationID` es **obligatorio** en el provider `customJwt` y debe igualar el `aud` del JWT (= baseURL de Better Auth).
+- El plugin `jwt` necesita una tabla/modelo `jwks`; sin añadirla al adaptador → `Unknown auth model: jwks`.
+
+**Limpieza pendiente**: quitar la query `whoami` y borrar los usuarios de prueba `idor-*@example.com` creados al verificar.
+
+---
+
+## Fase 2 — migrar funciones (PENDIENTE, el arreglo real)
 
 ## Problema
 
