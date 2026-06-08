@@ -1,7 +1,35 @@
 # Plan: corregir el IDOR / Broken Access Control (auditoría jun 2026)
 
-> Estado: **Fase 1 COMPLETA y verificada en prod** (jun 2026). Falta la Fase 2
-> (migrar funciones). Es la vulnerabilidad más grave de la app.
+> Estado: **RESUELTO y verificado en prod** (jun 2026). Fases 1 y 2 completas.
+> Queda solo limpieza cosmética (ver final).
+
+## ✅ Fase 2 hecha — funciones migradas a requireUserId
+
+Todas las funciones públicas llamadas por el frontend derivan ahora el userId
+de la sesión verificada (`requireUserId(ctx)`) e ignoran el `userId` del cliente
+(arg dejado `v.optional` por compatibilidad). Cubiertas: assistant(+action),
+subscriptions, users, taxonomy, insights(+actions), notifications, statements,
+transactions, categoryRules, projections(+action), apiKeys, stripeActions,
+onboarding. Se cerraron además ownership checks que faltaban
+(markNotificationRead, getStatementById, setTransactionExcluded,
+updateTransactionCategory, listTransactions por statementId).
+
+- **Anti-carrera**: `/app` y `/onboarding` envueltos en `ConvexAuthGate`
+  (no renderizan hasta `useConvexAuth().isAuthenticated`).
+- **Doble uso** (web + API HTTP sin sesión): wrapper público (`requireUserId`)
+  + interno con userId de confianza — `processStatement`/`processStatementInternal`,
+  `generateMonthInsights`/`...Internal`. `processApiTransactions` → interna.
+  `http.ts` usa variantes `*Internal` con el userId de la API key.
+- **Verificado en prod**: spoof de userId ajeno → ignorado; sin token →
+  "No autenticado"; API pública sigue respondiendo 401 sin key.
+
+### Limpieza pendiente (cosmética / housekeeping, NO seguridad)
+- Quitar la query temporal `authz:whoami`.
+- Borrar usuarios de prueba `idor-*@example.com` del table `user`.
+- Quitar los args `userId` opcionales ya ignorados (backend) y dejar de pasarlos (frontend).
+
+---
+## (Histórico) Plan original
 
 ## ✅ Fase 1 hecha (identidad disponible en Convex)
 
