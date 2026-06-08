@@ -11,7 +11,8 @@ const authConfig = {
   providers: [
     {
       type: "customJwt",
-      applicationID: "convex", // must match the JWT `aud` (set in auth.ts jwt plugin)
+      // Better Auth's jwt plugin sets `aud` to the baseURL (= issuer here).
+      applicationID: issuer,
       issuer,
       jwks: `${issuer}/api/auth/jwks`,
       algorithm: "RS256",
