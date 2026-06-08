@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Playfair_Display, DM_Sans, DM_Mono } from "next/font/google";
 import { ConvexClientProvider } from "@/components/ConvexClientProvider";
 import "./globals.css";
@@ -22,10 +22,49 @@ const dmMono = DM_Mono({
   weight: ["400", "500"],
 });
 
+// Production URL — set NEXT_PUBLIC_SITE_URL in Netlify to your real domain.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "https://yieldapp-goals.netlify.app";
+
+const title = "Yield — Entiende tu dinero en 2 minutos";
+const description =
+  "Sube tus extractos bancarios y obtén un dashboard claro con tus ingresos, gastos y capacidad real de ahorro. Con IA conversacional incluida.";
+
 export const metadata: Metadata = {
-  title: "Yield — Entiende tu dinero en 2 minutos",
-  description:
-    "Sube tus extractos bancarios y obtén un dashboard claro con tus ingresos, gastos y capacidad real de ahorro. Con IA conversacional incluida.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: title,
+    template: "%s · Yield",
+  },
+  description,
+  applicationName: "Yield",
+  keywords: [
+    "finanzas personales",
+    "extractos bancarios",
+    "dashboard financiero",
+    "ahorro",
+    "presupuesto",
+    "IA financiera",
+  ],
+  authors: [{ name: "Yield" }],
+  openGraph: {
+    type: "website",
+    locale: "es_ES",
+    url: siteUrl,
+    siteName: "Yield",
+    title,
+    description,
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+  },
+  robots: { index: true, follow: true },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#F4EFE5",
 };
 
 export default function RootLayout({
