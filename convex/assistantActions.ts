@@ -5,6 +5,7 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { Doc } from "./_generated/dataModel";
 import { subscriptionIsPro } from "./subscriptionHelpers";
+import { requireUserId } from "./authz";
 import Anthropic from "@anthropic-ai/sdk";
 
 // Conversational assistant (Pro). Answers free-form questions about the user's
@@ -115,13 +116,16 @@ function buildContext(txs: Doc<"transactions">[]) {
 // message in the conversation is the question being answered.
 export const ask = action({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()), // accepted for backward compat, ignored
     conversationId: v.id("assistant_conversations"),
   },
   handler: async (ctx, args): Promise<string> => {
+    // IDOR fix: identity comes from the verified session, not the client arg.
+    const userId = await requireUserId(ctx);
+
     // The conversational assistant is a Pro feature — enforce server-side too.
     const sub = await ctx.runQuery(internal.subscriptions.getSubscriptionInternal, {
-      userId: args.userId,
+      userId,
     });
     if (!subscriptionIsPro(sub)) {
       return "El asistente es una función Pro. Actívala para preguntar sobre tus finanzas con tus números reales.";
@@ -131,7 +135,7 @@ export const ask = action({
     const convo = await ctx.runQuery(internal.assistant.getConversationInternal, {
       conversationId: args.conversationId,
     });
-    if (!convo || convo.userId !== args.userId) {
+    if (!convo || convo.userId !== userId) {
       throw new Error("Conversación no encontrada.");
     }
 
@@ -150,7 +154,7 @@ export const ask = action({
 
     const allTxs: Doc<"transactions">[] = await ctx.runQuery(
       internal.transactions.getAllTransactionsInternal,
-      { userId: args.userId }
+      { userId }
     );
     const txs = allTxs.filter((t) => t.excluded !== true);
 
@@ -193,7 +197,7 @@ ${JSON.stringify(context)}`;
 
     await ctx.runMutation(internal.assistant.addAssistantMessage, {
       conversationId: args.conversationId,
-      userId: args.userId,
+      userId,
       text: answer,
     });
     return answer;

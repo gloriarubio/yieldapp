@@ -6,9 +6,14 @@ import {
   QueryCtx,
 } from "./_generated/server";
 import { v } from "convex/values";
+import { requireUserId } from "./authz";
 
 // Persistence for the conversational assistant (/app/asistente). Pure
 // queries/mutations (V8 runtime); the Claude call lives in assistantActions.ts.
+//
+// IDOR fix (Phase 2): the userId comes from the verified session via
+// requireUserId(ctx); the optional `userId` arg is accepted for backward compat
+// with the not-yet-updated client but IGNORED (to be removed in cleanup).
 
 const DEFAULT_TITLE = "Nueva conversación";
 
@@ -24,11 +29,12 @@ async function ownedConversation(
 
 // All conversations for the user, most recently updated first.
 export const listConversations = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     const convos = await ctx.db
       .query("assistant_conversations")
-      .withIndex("by_user", (q) => q.eq("userId", args.userId))
+      .withIndex("by_user", (q) => q.eq("userId", userId))
       .collect();
     return convos.sort((a, b) => b.updatedAt - a.updatedAt);
   },
@@ -37,11 +43,12 @@ export const listConversations = query({
 // Messages of one conversation (ownership-checked), oldest first.
 export const getMessages = query({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     conversationId: v.id("assistant_conversations"),
   },
   handler: async (ctx, args) => {
-    const convo = await ownedConversation(ctx, args.conversationId, args.userId);
+    const userId = await requireUserId(ctx);
+    const convo = await ownedConversation(ctx, args.conversationId, userId);
     if (!convo) return [];
     return await ctx.db
       .query("assistant_messages")
@@ -53,11 +60,12 @@ export const getMessages = query({
 });
 
 export const createConversation = mutation({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: { userId: v.optional(v.string()) },
+  handler: async (ctx) => {
+    const userId = await requireUserId(ctx);
     const now = Date.now();
     return await ctx.db.insert("assistant_conversations", {
-      userId: args.userId,
+      userId,
       title: DEFAULT_TITLE,
       createdAt: now,
       updatedAt: now,
@@ -69,17 +77,18 @@ export const createConversation = mutation({
 // conversation title from it.
 export const addUserMessage = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     conversationId: v.id("assistant_conversations"),
     text: v.string(),
   },
   handler: async (ctx, args) => {
-    const convo = await ownedConversation(ctx, args.conversationId, args.userId);
+    const userId = await requireUserId(ctx);
+    const convo = await ownedConversation(ctx, args.conversationId, userId);
     if (!convo) throw new Error("Conversación no encontrada.");
     const now = Date.now();
     await ctx.db.insert("assistant_messages", {
       conversationId: args.conversationId,
-      userId: args.userId,
+      userId,
       role: "user",
       text: args.text,
       createdAt: now,
@@ -94,11 +103,12 @@ export const addUserMessage = mutation({
 
 export const deleteConversation = mutation({
   args: {
-    userId: v.string(),
+    userId: v.optional(v.string()),
     conversationId: v.id("assistant_conversations"),
   },
   handler: async (ctx, args) => {
-    const convo = await ownedConversation(ctx, args.conversationId, args.userId);
+    const userId = await requireUserId(ctx);
+    const convo = await ownedConversation(ctx, args.conversationId, userId);
     if (!convo) return;
     const msgs = await ctx.db
       .query("assistant_messages")
