@@ -1,4 +1,3 @@
-import { query } from "./_generated/server";
 import type { QueryCtx, MutationCtx, ActionCtx } from "./_generated/server";
 
 // Central authorization helpers for the IDOR remediation (SECURITY-IDOR-PLAN.md).
@@ -14,15 +13,3 @@ export async function requireUserId(ctx: AnyCtx): Promise<string> {
   if (!identity) throw new Error("No autenticado");
   return identity.subject;
 }
-
-// Temporary verification endpoint: confirms Convex can read the Better Auth
-// identity. Remove once the migration is validated.
-export const whoami = query({
-  args: {},
-  handler: async (ctx) => {
-    const identity = await ctx.auth.getUserIdentity();
-    return identity
-      ? { authenticated: true, subject: identity.subject, issuer: identity.issuer }
-      : { authenticated: false };
-  },
-});
