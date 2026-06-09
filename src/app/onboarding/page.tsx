@@ -26,7 +26,7 @@ export default function OnboardingPage() {
 
   const status = useQuery(
     api.users.getOnboardingStatus,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
 
   // Already onboarded → dashboard

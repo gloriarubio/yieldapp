@@ -62,15 +62,15 @@ export default function ProyeccionesPage() {
 
   const rawTransactions = useQuery(
     api.transactions.listTransactions,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const subscription = useQuery(
     api.subscriptions.getSubscription,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const plan = useQuery(
     api.projections.getProjectionPlan,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const savePlan = useMutation(api.projections.saveProjectionPlan);
   const evaluatePlan = useAction(api.projectionsActions.evaluateProjectionPlan);
@@ -131,7 +131,6 @@ export default function ProyeccionesPage() {
         else cancelledNames.delete(name);
       }
       savePlan({
-        userId,
         goalName: plan?.goalName,
         targetAmount: plan?.targetAmount,
         targetDate: plan?.targetDate,
@@ -160,7 +159,6 @@ export default function ProyeccionesPage() {
     const amount = parseFloat(goalAmount.replace(",", "."));
     if (!goalName.trim() || !isFinite(amount) || amount <= 0) return;
     await savePlan({
-      userId,
       goalName: goalName.trim(),
       targetAmount: amount,
       targetDate: goalDate || undefined,
@@ -185,7 +183,6 @@ export default function ProyeccionesPage() {
         else cancelledNames.delete(name);
       }
       await savePlan({
-        userId,
         goalName: plan?.goalName,
         targetAmount: plan?.targetAmount,
         targetDate: plan?.targetDate,
@@ -194,7 +191,7 @@ export default function ProyeccionesPage() {
           .map(([category, monthlyCut]) => ({ category, monthlyCut })),
         cancelledSubscriptions: [...cancelledNames],
       });
-      await evaluatePlan({ userId });
+      await evaluatePlan({});
     } catch {
       setEvalError("No se pudo generar el análisis. Inténtalo de nuevo.");
     } finally {

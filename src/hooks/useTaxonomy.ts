@@ -12,7 +12,7 @@ import {
 export function useTaxonomy(userId: string | null) {
   const taxonomy = useQuery(
     api.taxonomy.getUserTaxonomy,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
 
   const activeCategories: TaxonomyCategory[] = useMemo(() => {

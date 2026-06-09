@@ -17,7 +17,7 @@ export function NewMerchantsBanner() {
 
   const notifications = useQuery(
     api.notifications.getUnreadNotifications,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
 
   const newMerchants = notifications?.find((n) => n.type === "new_merchants");

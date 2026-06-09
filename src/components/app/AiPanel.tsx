@@ -18,13 +18,13 @@ export function AiPanel() {
 
   const subscription = useQuery(
     api.subscriptions.getSubscription,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const locked = subscription?.plan === "free";
 
   const conversations = useQuery(
     api.assistant.listConversations,
-    userId && !locked ? { userId } : "skip"
+    userId && !locked ? {} : "skip"
   );
 
   useEffect(() => {

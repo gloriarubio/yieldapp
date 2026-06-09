@@ -28,17 +28,17 @@ export default function AsistentePage() {
 
   const subscription = useQuery(
     api.subscriptions.getSubscription,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const locked = subscription?.plan === "free";
 
   const conversations = useQuery(
     api.assistant.listConversations,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const messages = useQuery(
     api.assistant.getMessages,
-    userId && activeId ? { userId, conversationId: activeId } : "skip"
+    userId && activeId ? { conversationId: activeId } : "skip"
   );
 
   const createConversation = useMutation(api.assistant.createConversation);
@@ -59,14 +59,14 @@ export default function AsistentePage() {
     if (!q || sending || !userId) return;
     let cid = activeId;
     if (!cid) {
-      cid = await createConversation({ userId });
+      cid = await createConversation({});
       setActiveId(cid);
     }
     setInput("");
-    await addUserMessage({ userId, conversationId: cid, text: q });
+    await addUserMessage({ conversationId: cid, text: q });
     setSending(true);
     try {
-      await ask({ userId, conversationId: cid });
+      await ask({ conversationId: cid });
     } finally {
       setSending(false);
     }
@@ -80,7 +80,7 @@ export default function AsistentePage() {
 
   async function remove(id: Id<"assistant_conversations">) {
     if (!userId) return;
-    await deleteConversation({ userId, conversationId: id });
+    await deleteConversation({ conversationId: id });
     if (id === activeId) setActiveId(null);
   }
 

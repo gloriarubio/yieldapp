@@ -146,7 +146,7 @@ function SuscripcionTab({ userId }: { userId: string | null }) {
 
   const subscription = useQuery(
     api.subscriptions.getSubscription,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const createCheckout = useAction(api.stripeActions.createCheckoutSession);
   const createPortal = useAction(api.stripeActions.createPortalSession);
@@ -161,7 +161,7 @@ function SuscripcionTab({ userId }: { userId: string | null }) {
     setRedirecting(interval);
     setError("");
     try {
-      const { url } = await createCheckout({ userId, interval });
+      const { url } = await createCheckout({ interval });
       if (tab) tab.location.assign(url);
       else window.location.assign(url); // popup blocked → same-tab fallback
     } catch (err) {
@@ -178,7 +178,7 @@ function SuscripcionTab({ userId }: { userId: string | null }) {
     setRedirecting("portal");
     setError("");
     try {
-      const { url } = await createPortal({ userId });
+      const { url } = await createPortal({});
       if (tab) tab.location.assign(url);
       else window.location.assign(url);
     } catch (err) {
@@ -345,13 +345,13 @@ function ApiTab({ userId, onUpgrade }: { userId: string | null; onUpgrade: () =>
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
 
-  const keys = useQuery(api.apiKeys.listApiKeys, userId ? { userId } : "skip");
+  const keys = useQuery(api.apiKeys.listApiKeys, userId ? {} : "skip");
   const createApiKey = useAction(api.apiKeys.createApiKey);
   const revokeApiKey = useMutation(api.apiKeys.revokeApiKey);
   // La API es una función Pro (el backend también lo comprueba al crear claves)
   const subscription = useQuery(
     api.subscriptions.getSubscription,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const isFree = subscription?.plan === "free";
 
@@ -361,7 +361,6 @@ function ApiTab({ userId, onUpgrade }: { userId: string | null; onUpgrade: () =>
     setError("");
     try {
       const { key } = await createApiKey({
-        userId,
         name: newKeyName.trim() || "API key",
       });
       setCreatedKey(key);
@@ -376,7 +375,7 @@ function ApiTab({ userId, onUpgrade }: { userId: string | null; onUpgrade: () =>
 
   async function handleRevoke(keyId: Id<"api_keys">) {
     if (!userId) return;
-    await revokeApiKey({ userId, keyId });
+    await revokeApiKey({ keyId });
   }
 
   async function copyKey() {

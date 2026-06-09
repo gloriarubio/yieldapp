@@ -28,11 +28,11 @@ export default function ClasificarPage() {
 
   const notifications = useQuery(
     api.notifications.getUnreadNotifications,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const transactions = useQuery(
     api.transactions.listTransactions,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
 
   const notification = notifications?.find((n) => n.type === "new_merchants");
@@ -98,7 +98,6 @@ export default function ClasificarPage() {
     setError("");
     try {
       await saveOnboardingRules({
-        userId,
         answers: groups.map((g) => ({
           merchantPattern: g.merchantPattern,
           category: answerFor(g).category,

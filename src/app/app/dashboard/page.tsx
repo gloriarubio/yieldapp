@@ -168,7 +168,7 @@ export default function DashboardPage() {
 
   const rawTransactions = useQuery(
     api.transactions.listTransactions,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
 
   // User-excluded transactions don't take part in the dashboard or analyses
@@ -181,7 +181,7 @@ export default function DashboardPage() {
   // "all"); Pro: per-month insights for the selected month
   const subscription = useQuery(
     api.subscriptions.getSubscription,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const periodInsightsMode = subscription?.plan === "free";
 
@@ -189,7 +189,7 @@ export default function DashboardPage() {
   const monthInsights = useQuery(
     api.insights.getMonthInsights,
     userId && subscription !== undefined
-      ? { userId, month: periodInsightsMode ? "all" : monthString }
+      ? { month: periodInsightsMode ? "all" : monthString }
       : "skip"
   );
 

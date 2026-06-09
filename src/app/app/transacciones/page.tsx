@@ -52,7 +52,7 @@ export default function TransaccionesPage() {
 
   const rawTransactions = useQuery(
     api.transactions.listTransactions,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
 
   if (!userId || rawTransactions === undefined) {

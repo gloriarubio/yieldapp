@@ -72,7 +72,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
   // patches statement.progress
   const liveStatements = useQuery(
     api.statements.listStatements,
-    step === 2 ? { userId } : "skip"
+    step === 2 ? {} : "skip"
   );
 
   const [transactions, setTransactions] = useState<ProcessedTx[]>([]);
@@ -117,7 +117,6 @@ export function OnboardingWizard({ userId }: { userId: string }) {
         const { storageId } = (await uploadRes.json()) as { storageId: Id<"_storage"> };
 
         const { transactions: rows } = await processOnboardingStatement({
-          userId,
           storageId,
           filename: file.name,
           fileType: fileTypeFromName(file.name),
@@ -150,7 +149,6 @@ export function OnboardingWizard({ userId }: { userId: string }) {
     if (winners.size > 0) {
       try {
         await consolidateMerchants({
-          userId,
           assignments: [...winners.entries()].map(([merchantPattern, category]) => ({
             merchantPattern,
             category,
@@ -298,7 +296,6 @@ export function OnboardingWizard({ userId }: { userId: string }) {
     setSaving(true);
     try {
       await saveOnboardingRules({
-        userId,
         answers: groups.map((g) => ({
           merchantPattern: g.merchantPattern,
           category: answers[g.merchantPattern].category,

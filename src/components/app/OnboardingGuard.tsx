@@ -23,7 +23,7 @@ export function OnboardingGuard() {
 
   const status = useQuery(
     api.users.getOnboardingStatus,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
 
   useEffect(() => {

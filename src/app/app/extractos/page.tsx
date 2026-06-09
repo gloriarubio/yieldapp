@@ -45,17 +45,17 @@ export default function ExtractosPage() {
   const processStatement = useAction(api.process.processStatement);
   const statements = useQuery(
     api.statements.listStatements,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   // Free plan: only the initial onboarding upload — afterwards uploads are
   // locked behind Pro (the backend enforces it too; this is just the UI)
   const subscription = useQuery(
     api.subscriptions.getSubscription,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const onboarding = useQuery(
     api.users.getOnboardingStatus,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const uploadsLocked =
     subscription?.plan === "free" && onboarding?.onboardingCompleted === true;
@@ -93,7 +93,6 @@ export default function ExtractosPage() {
       setPhase("processing");
       const { transactionCount } = await processStatement({
         storageId,
-        userId,
         filename: file.name,
         fileType,
       });

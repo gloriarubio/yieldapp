@@ -92,7 +92,7 @@ export function Sidebar() {
 
   const subscription = useQuery(
     api.subscriptions.getSubscription,
-    userId ? { userId } : "skip"
+    userId ? {} : "skip"
   );
   const isPro = subscription?.plan === "pro";
 

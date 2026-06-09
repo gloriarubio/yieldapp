@@ -77,8 +77,8 @@ export function MonthInsights({ insights, month, hasData, userId, period = false
     setGenError(null);
     try {
       // The dashboard's getMonthInsights subscription picks up the result
-      if (period) await generatePeriod({ userId });
-      else await generateMonth({ userId, month });
+      if (period) await generatePeriod({});
+      else await generateMonth({ month });
     } catch {
       setGenError("Error al generar. Inténtalo de nuevo.");
     } finally {
