@@ -39,7 +39,7 @@ export const createNewMerchantsNotification = internalMutation({
 });
 
 export const getUnreadNotifications = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     return await ctx.db

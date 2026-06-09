@@ -71,7 +71,6 @@ async function syncSubscription(
 
 export const createCheckoutSession = action({
   args: {
-    userId: v.optional(v.string()),
     interval: v.union(v.literal("month"), v.literal("year")),
   },
   handler: async (ctx, args): Promise<{ url: string }> => {
@@ -132,7 +131,7 @@ export const createCheckoutSession = action({
 // ─── Customer Portal (manage / cancel / change payment method) ──────────────
 
 export const createPortalSession = action({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx): Promise<{ url: string }> => {
     const userId = await requireUserId(ctx);
     const stripe = getStripe();

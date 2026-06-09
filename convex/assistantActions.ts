@@ -116,7 +116,6 @@ function buildContext(txs: Doc<"transactions">[]) {
 // message in the conversation is the question being answered.
 export const ask = action({
   args: {
-    userId: v.optional(v.string()), // accepted for backward compat, ignored
     conversationId: v.id("assistant_conversations"),
   },
   handler: async (ctx, args): Promise<string> => {

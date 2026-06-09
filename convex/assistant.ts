@@ -29,7 +29,7 @@ async function ownedConversation(
 
 // All conversations for the user, most recently updated first.
 export const listConversations = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     const convos = await ctx.db
@@ -43,7 +43,6 @@ export const listConversations = query({
 // Messages of one conversation (ownership-checked), oldest first.
 export const getMessages = query({
   args: {
-    userId: v.optional(v.string()),
     conversationId: v.id("assistant_conversations"),
   },
   handler: async (ctx, args) => {
@@ -60,7 +59,7 @@ export const getMessages = query({
 });
 
 export const createConversation = mutation({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     const now = Date.now();
@@ -77,7 +76,6 @@ export const createConversation = mutation({
 // conversation title from it.
 export const addUserMessage = mutation({
   args: {
-    userId: v.optional(v.string()),
     conversationId: v.id("assistant_conversations"),
     text: v.string(),
   },
@@ -103,7 +101,6 @@ export const addUserMessage = mutation({
 
 export const deleteConversation = mutation({
   args: {
-    userId: v.optional(v.string()),
     conversationId: v.id("assistant_conversations"),
   },
   handler: async (ctx, args) => {

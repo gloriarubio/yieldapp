@@ -33,7 +33,6 @@ export const insertTransactions = internalMutation({
 
 export const listTransactions = query({
   args: {
-    userId: v.optional(v.string()),
     statementId: v.optional(v.id("statements")),
   },
   handler: async (ctx, args) => {
@@ -209,7 +208,6 @@ async function consolidate(
 
 export const consolidateMerchantCategories = mutation({
   args: {
-    userId: v.optional(v.string()),
     // Optional explicit pattern → category map (the onboarding wizard passes
     // the same resolution it shows the user, so UI and DB always agree)
     assignments: v.optional(

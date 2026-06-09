@@ -6,7 +6,7 @@ import { requireUserId } from "./authz";
 // IDOR fix: the userId is the verified session subject (the optional `userId`
 // arg is accepted for backward compat but ignored).
 export const getOnboardingStatus = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     const user = await ctx.db

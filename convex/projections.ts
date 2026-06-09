@@ -21,7 +21,7 @@ async function getByUserId(ctx: QueryCtx, userId: string) {
 }
 
 export const getProjectionPlan = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     return await getByUserId(ctx, userId);
@@ -36,10 +36,10 @@ export const getProjectionPlanInternal = internalQuery({
 });
 
 export const saveProjectionPlan = mutation({
-  args: { userId: v.optional(v.string()), ...planFields },
+  args: { ...planFields },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
-    const { userId: _ignored, ...fields } = args;
+    const fields = args;
     const existing = await getByUserId(ctx, userId);
     if (existing) {
       await ctx.db.patch(existing._id, { ...fields, updatedAt: Date.now() });

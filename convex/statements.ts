@@ -95,7 +95,7 @@ export const updateInsights = internalMutation({
 });
 
 export const listStatements = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     return await ctx.db

@@ -16,7 +16,7 @@ import { requireUserId } from "./authz";
 // cuts realistic given the spending history, and what better levers exist?
 // The verdict is cached on the plan document (see projections.saveAiVerdict).
 export const evaluateProjectionPlan = action({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx): Promise<string> => {
     const userId = await requireUserId(ctx);
     const [plan, allTxs]: [

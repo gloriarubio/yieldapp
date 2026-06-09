@@ -8,7 +8,7 @@ const insightValidator = v.object({
 });
 
 export const getMonthInsights = query({
-  args: { userId: v.optional(v.string()), month: v.string() },
+  args: { month: v.string() },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     return await ctx.db

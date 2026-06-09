@@ -33,7 +33,6 @@ export type OnboardingTxResult = {
 // reuse that pipeline instead.
 export const processOnboardingStatement = action({
   args: {
-    userId: v.optional(v.string()),
     storageId: v.id("_storage"),
     filename: v.string(),
     fileType: v.union(v.literal("pdf"), v.literal("csv"), v.literal("excel")),

@@ -15,7 +15,7 @@ const MAX_KEYS_PER_USER = 10;
 // ─── Settings UI ─────────────────────────────────────────────────────────────
 
 export const listApiKeys = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     const keys = await ctx.db
@@ -36,7 +36,7 @@ export const listApiKeys = query({
 });
 
 export const createApiKey = action({
-  args: { userId: v.optional(v.string()), name: v.string() },
+  args: { name: v.string() },
   handler: async (ctx, args): Promise<{ key: string; prefix: string }> => {
     const userId = await requireUserId(ctx);
     // "API + automatizaciones" is a Pro feature — existing keys keep working
@@ -62,7 +62,7 @@ export const createApiKey = action({
 });
 
 export const revokeApiKey = mutation({
-  args: { userId: v.optional(v.string()), keyId: v.id("api_keys") },
+  args: { keyId: v.id("api_keys") },
   handler: async (ctx, args) => {
     const userId = await requireUserId(ctx);
     const key = await ctx.db.get(args.keyId);

@@ -20,7 +20,7 @@ type InsightRow = { type: "warning" | "trend" | "suggestion"; text: string };
 // dashboard's "Generar análisis" button.
 // Public wrapper (dashboard): verified identity → internal generator.
 export const generateMonthInsights = action({
-  args: { userId: v.optional(v.string()), month: v.string() },
+  args: { month: v.string() },
   handler: async (ctx, args): Promise<InsightRow[] | null> => {
     const userId = await requireUserId(ctx);
     return await ctx.runAction(internal.insightsActions.generateMonthInsightsInternal, {
@@ -122,7 +122,7 @@ Responde ÚNICAMENTE con un array JSON válido, sin markdown, sin texto adiciona
 // month, a single global look at ALL the user's uploaded data. Stored in
 // monthlyInsights under the sentinel month "all".
 export const generatePeriodInsights = action({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx): Promise<InsightRow[] | null> => {
     const userId = await requireUserId(ctx);
     const allTxs: Doc<"transactions">[] = await ctx.runQuery(

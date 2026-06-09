@@ -22,7 +22,7 @@ const renameValidator = v.object({
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
 export const getUserRules = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     return await ctx.db
@@ -168,7 +168,6 @@ async function syncTaxonomy(
 // the queries/mutations in this codebase).
 export const saveOnboardingRules = mutation({
   args: {
-    userId: v.optional(v.string()),
     answers: v.array(answerValidator),
     // Cosmetic category renames done in step 4 of the wizard
     renames: v.optional(v.array(renameValidator)),

@@ -48,7 +48,6 @@ type TaxonomyDoc = {
 export const processStatement = action({
   args: {
     storageId: v.id("_storage"),
-    userId: v.optional(v.string()), // accepted for backward compat, ignored
     filename: v.string(),
     fileType: v.union(v.literal("pdf"), v.literal("csv"), v.literal("excel")),
   },

@@ -17,7 +17,7 @@ async function getByUserId(ctx: QueryCtx, userId: string) {
 // ─── Reads ───────────────────────────────────────────────────────────────────
 
 export const getSubscription = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     const sub = await getByUserId(ctx, userId);

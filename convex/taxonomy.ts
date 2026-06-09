@@ -93,7 +93,7 @@ export const SEED_CATEGORIES = [
 // ─── Queries ─────────────────────────────────────────────────────────────────
 
 export const getUserTaxonomy = query({
-  args: { userId: v.optional(v.string()) },
+  args: {},
   handler: async (ctx) => {
     const userId = await requireUserId(ctx);
     return await ctx.db
