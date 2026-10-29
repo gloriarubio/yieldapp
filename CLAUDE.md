@@ -12,6 +12,27 @@ npm run lint         # ESLint
 
 Port 3000 is often occupied by another local project — use `npm run dev -- -p 3001` in that case.
 
+## Setup en máquina nueva
+
+Se trabaja desde dos ordenadores (portátil y sobremesa, Windows). Código por GitHub, secretos por
+Bitwarden; **nunca** secretos en git (el repo es **público**: lo exige Netlify Free, ver "Despliegue").
+
+1. **Requisitos:** Git, GitHub CLI (`gh`, sesión `gloriarubio`), Node ≥ 20, Bitwarden CLI
+   (`npm i -g @bitwarden/cli`). Para desplegar Convex: `npx convex login`.
+2. **Clonar** en la ruta de siempre (así coincide la memoria de Claude del proyecto):
+   ```bash
+   gh repo clone gloriarubio/yieldapp C:/dev/ideas/yieldapp
+   ```
+3. **Secretos** (Git Bash; en PowerShell: `$env:BW_SESSION = (bw unlock --raw)` y `bash ./scripts/pull-secrets.sh`):
+   ```bash
+   bw config server https://vault.bitwarden.eu && bw login     # solo la primera vez
+   export BW_SESSION="$(bw unlock --raw)"
+   ./scripts/pull-secrets.sh
+   ```
+   Regenera `.env.local` desde la nota `dev/yieldapp/.env.local` de Bitwarden (plantilla: `.env.example`).
+4. **Dependencias:** `npm install`, `npm run build`.
+5. **Despliegue:** push a `main` = deploy en Netlify. Convex va aparte (`npx convex dev --once`).
+
 ## Architecture
 
 **Yield** is a financial SaaS landing page (Next.js 16 App Router). The full product — dashboard, file upload, AI assistant — is planned but not yet built. Today only the marketing landing page exists.
